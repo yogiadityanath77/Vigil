@@ -91,6 +91,18 @@
 
     .doctor-lines li:last-child { border-bottom: none; }
 
+    /* ── Per-fact freshness signal ────────────────────────────────── */
+    .confirmed {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.78rem;
+      color: #999999;
+    }
+    .confirmed.stale {
+      color: #b8860b;
+      font-weight: 600;
+    }
+
     .no-info {
       color: #888888;
       font-style: italic;
@@ -207,7 +219,12 @@
     {% if script.has_medical_info %}
       <ul class="doctor-lines">
         {% for line in script.doctor_lines %}
-          <li>{{ line }}</li>
+          <li>
+            {{ line.text }}
+            <span class="confirmed{% if line.is_stale %} stale{% endif %}">
+              {{ line.confirmed_label }}{% if line.is_stale %} · may be outdated{% endif %}
+            </span>
+          </li>
         {% endfor %}
       </ul>
     {% else %}

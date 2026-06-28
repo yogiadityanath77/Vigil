@@ -82,3 +82,21 @@ The richer, tiered "for family" view is Slice 9; until it exists, pointing at th
 the honest target rather than inventing a dead link.
 **Affects:** slice 7 schema/endpoint/template; slice 9 (the secure link gains a family-tier view);
 later slices for real SMS, rate-limiting, delivery-ack, and escalation.
+
+## D9 — Freshness is PER-FACT; `build_crisis_script` takes `now` as a parameter (stays pure)
+`last_confirmed_at` lives on `medical_fact` (one timestamp per fact), realizing what D5 reserved
+stable per-fact identity for. It is set to now on creation, and bumped by both an explicit
+`POST .../facts/{id}/confirm` and any value/type edit (editing re-affirms the fact). Re-confirming
+or editing one fact never touches another's timestamp — the whole point of D5.
+**Scope:** per-fact only this slice. `person.last_confirmed_at` (in architecture.md) is deferred —
+not built — to avoid scope creep; per-fact is the concept-true signal the demo rides on.
+**Purity:** showing "confirmed 3 weeks ago" needs a reference time, and reading the clock inside
+the transform would break its "no side effects / deterministic" contract (transform.py). So the
+signature became `build_crisis_script(person, *, now)` — the route passes
+`datetime.now(timezone.utc)`, tests pass a fixed `NOW`. The relative phrasing (`humanize_age`) and
+the `STALE_AFTER_DAYS = 180` threshold also live in transform.py as pure helpers.
+**Display:** `doctor_lines` changed from `list[str]` to `list[DoctorLine]` (text + confirmed_label
++ is_stale). Stale facts (>180 days) are still shown in full, with an amber "· may be outdated"
+cue — honesty, not hiding. The freshness *nudge/reminder engine* remains deferred (prototype-spec).
+**Affects:** slice 8 schema/transform/endpoint/template; the transform's output contract (any
+renderer now consumes DoctorLine objects); later freshness-nudge and per-person-timestamp slices.

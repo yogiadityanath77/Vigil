@@ -152,6 +152,49 @@ class TestFactEndpoints:
         )
         assert resp.status_code == 422
 
+    def test_add_fact_returns_last_confirmed_at(self, person):
+        resp = client.post(
+            f"/coordinator/persons/{person.id}/facts",
+            json={"type": "allergy", "value": "Aspirin"},
+        )
+        assert resp.status_code == 201
+        assert "last_confirmed_at" in resp.json()
+
+    def test_confirm_fact_bumps_timestamp(self, person, db):
+        from datetime import datetime, timedelta, timezone
+
+        fact = add_fact(db, person, FactCreate(type=FactType.allergy, value="X"))
+        fact.last_confirmed_at = datetime.now(timezone.utc) - timedelta(days=30)
+        db.commit()
+        old = fact.last_confirmed_at
+
+        resp = client.post(f"/coordinator/persons/{person.id}/facts/{fact.id}/confirm")
+        assert resp.status_code == 200
+        new = datetime.fromisoformat(resp.json()["last_confirmed_at"])
+        assert new > old
+
+    def test_update_fact_refreshes_confirmed(self, person, db):
+        from datetime import datetime, timedelta, timezone
+
+        fact = add_fact(db, person, FactCreate(type=FactType.allergy, value="X"))
+        fact.last_confirmed_at = datetime.now(timezone.utc) - timedelta(days=30)
+        db.commit()
+        old = fact.last_confirmed_at
+
+        resp = client.patch(
+            f"/coordinator/persons/{person.id}/facts/{fact.id}", json={"value": "Y"}
+        )
+        assert resp.status_code == 200
+        new = datetime.fromisoformat(resp.json()["last_confirmed_at"])
+        assert new > old
+
+    def test_confirm_unknown_fact_returns_404(self, person):
+        import uuid
+        resp = client.post(
+            f"/coordinator/persons/{person.id}/facts/{uuid.uuid4()}/confirm"
+        )
+        assert resp.status_code == 404
+
     def test_delete_fact(self, person, db):
         fact = add_fact(db, person, FactCreate(type=FactType.condition, value="Asthma"))
         resp = client.delete(f"/coordinator/persons/{person.id}/facts/{fact.id}")

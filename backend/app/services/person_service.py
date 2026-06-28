@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -31,6 +32,10 @@ from app.schemas.coordinator import (
     PersonCreate,
     PersonUpdate,
 )
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def generate_crisis_slug() -> str:
@@ -89,6 +94,17 @@ def update_fact(db: Session, fact: MedicalFact, data: FactUpdate) -> MedicalFact
         fact.type = data.type
     if data.value is not None:
         fact.value = data.value
+    # Editing the value/type is itself a re-affirmation of accuracy, so refresh
+    # the freshness signal. Only this fact's timestamp moves (D5: stable identity).
+    fact.last_confirmed_at = _now()
+    db.commit()
+    db.refresh(fact)
+    return fact
+
+
+def confirm_fact(db: Session, fact: MedicalFact) -> MedicalFact:
+    """Re-affirm a fact is still accurate without changing it — bumps freshness."""
+    fact.last_confirmed_at = _now()
     db.commit()
     db.refresh(fact)
     return fact

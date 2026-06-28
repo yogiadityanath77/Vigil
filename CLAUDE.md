@@ -76,4 +76,11 @@ This is a LEARNING PROTOTYPE, built strictly one slice at a time. Not production
   - Crisis page button → browser geolocation → AJAX → per-contact message preview
   - Location optional (graceful when denied); secure link = crisis URL until Slice 9
   - 68 tests passing (was 54)
-- NEXT → Slice 8: "last confirmed [date]" display on the facts
+- Slice 8 (per-fact "last confirmed [date]" freshness signal): DONE
+  - `medical_fact.last_confirmed_at` (migration 0004); D9 logged
+  - transform now pure-with-`now`: doctor_lines are DoctorLine(text/label/is_stale);
+    humanize_age + STALE_AFTER_DAYS=180 in transform.py
+  - Bumped on create, on /confirm endpoint, and on value/type edit (edit = re-affirm)
+  - Crisis page shows "confirmed X ago"; stale (>180d) flagged amber "may be outdated"
+  - Seed backdates 2 facts for a fresh/stale demo mix; 85 tests passing (was 68)
+- NEXT → Slice 9: two-level hint (open script vs. richer "for family" view)

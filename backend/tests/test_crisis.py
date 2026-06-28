@@ -101,6 +101,30 @@ def test_crisis_page_404_on_unknown_slug():
     assert resp.status_code == 404
 
 
+def test_crisis_page_shows_freshness_label(two_persons):
+    p1, _ = two_persons  # facts just created → "confirmed today"
+    resp = client.get(f"/c/{p1.crisis_slug}")
+    assert resp.status_code == 200
+    assert "confirmed today" in resp.text
+
+
+def test_crisis_page_flags_stale_fact(db):
+    from datetime import datetime, timedelta, timezone
+
+    p = create_person(db, PersonCreate(full_name="Test Stale"))
+    fact = add_fact(db, p, FactCreate(type=FactType.condition, value="Old condition"))
+    fact.last_confirmed_at = datetime.now(timezone.utc) - timedelta(days=240)
+    db.commit()
+    try:
+        resp = client.get(f"/c/{p.crisis_slug}")
+        assert resp.status_code == 200
+        assert "may be outdated" in resp.text
+        assert "8 months ago" in resp.text
+    finally:
+        db.delete(p)
+        db.commit()
+
+
 def test_crisis_page_has_notify_button(two_persons):
     p1, _ = two_persons
     resp = client.get(f"/c/{p1.crisis_slug}")

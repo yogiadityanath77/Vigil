@@ -12,12 +12,50 @@ This isolation means:
   - When the script grows (guard-rails, tiers, more fact types), changes stay here.
 """
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.person import Person
 
 from app.models.person import FactType
+
+# A fact unconfirmed for longer than this is flagged "may be outdated" on the
+# crisis page. ~6 months: long enough to not nag, short enough that an
+# 8-month-old fact (D5's example) reads as stale.
+STALE_AFTER_DAYS = 180
+
+
+def humanize_age(now: datetime, then: datetime) -> str:
+    """
+    Pure relative-time phrase for "confirmed <X>". Coarse on purpose — a
+    responder needs the gist ("weeks ago"), not precision. Future timestamps
+    (clock skew) and the current day both read as "today".
+    """
+    days = (now - then).days
+    if days <= 0:
+        return "confirmed today"
+    if days == 1:
+        return "confirmed yesterday"
+    if days < 7:
+        return f"confirmed {days} days ago"
+    if days < 30:
+        weeks = days // 7
+        return f"confirmed {weeks} week{'s' if weeks > 1 else ''} ago"
+    if days < 365:
+        months = days // 30
+        return f"confirmed {months} month{'s' if months > 1 else ''} ago"
+    years = days // 365
+    return f"confirmed {years} year{'s' if years > 1 else ''} ago"
+
+
+@dataclass
+class DoctorLine:
+    """One 'tell the doctor' sentence plus its freshness signal."""
+
+    text: str             # "They are allergic to Penicillin."
+    confirmed_label: str  # "confirmed 3 weeks ago"
+    is_stale: bool        # older than STALE_AFTER_DAYS
 
 
 @dataclass
@@ -46,9 +84,9 @@ class CrisisScript:
     call_phone: str
     call_relation: str | None  # "husband", "son", etc.
 
-    # Pre-composed "tell the doctor" sentences, in display order:
+    # Pre-composed "tell the doctor" lines, in display order:
     # allergies first (highest urgency), then medications, then conditions.
-    doctor_lines: list[str] = field(default_factory=list)
+    doctor_lines: list[DoctorLine] = field(default_factory=list)
 
     # The money guard-rail (insurance). None when no insurance is on file.
     guard_rail: GuardRail | None = None
@@ -62,9 +100,13 @@ class CrisisScript:
         return self.guard_rail is not None
 
 
-def build_crisis_script(person: "Person") -> CrisisScript:
+def build_crisis_script(person: "Person", *, now: datetime) -> CrisisScript:
     """
     Transform a Person (with loaded relationships) into a CrisisScript.
+
+    `now` is passed in (not read from the clock) so this stays a pure function:
+    deterministic given its inputs, and the relative "confirmed X ago" labels are
+    fixed in tests. The route supplies datetime.now(timezone.utc).
 
     Ordering decisions made here:
       - Emergency contacts sorted by notify_order; first contact drives the script.
@@ -76,20 +118,27 @@ def build_crisis_script(person: "Person") -> CrisisScript:
     primary = contacts[0] if contacts else None
 
     # ── Doctor lines (allergies → medications → conditions) ─────────────────
-    buckets: dict[FactType, list[str]] = {t: [] for t in FactType}
+    sentence_for = {
+        FactType.allergy: lambda v: f"They are allergic to {v}.",
+        FactType.medication: lambda v: f"They take {v}.",
+        FactType.condition: lambda v: f"They have {v}.",
+    }
+    buckets: dict[FactType, list[DoctorLine]] = {t: [] for t in FactType}
     for fact in person.medical_facts:
-        buckets[fact.type].append(fact.value)
+        age_days = (now - fact.last_confirmed_at).days
+        buckets[fact.type].append(
+            DoctorLine(
+                text=sentence_for[fact.type](fact.value),
+                confirmed_label=humanize_age(now, fact.last_confirmed_at),
+                is_stale=age_days > STALE_AFTER_DAYS,
+            )
+        )
 
-    doctor_lines: list[str] = []
-
-    for allergy in buckets[FactType.allergy]:
-        doctor_lines.append(f"They are allergic to {allergy}.")
-
-    for med in buckets[FactType.medication]:
-        doctor_lines.append(f"They take {med}.")
-
-    for condition in buckets[FactType.condition]:
-        doctor_lines.append(f"They have {condition}.")
+    doctor_lines: list[DoctorLine] = [
+        *buckets[FactType.allergy],
+        *buckets[FactType.medication],
+        *buckets[FactType.condition],
+    ]
 
     # ── Money guard-rail (insurance) ────────────────────────────────────────
     guard_rail = _build_guard_rail(person.insurance)

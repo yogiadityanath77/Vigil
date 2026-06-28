@@ -85,6 +85,13 @@ class MedicalFact(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_now
     )
+    # last_confirmed_at: when a human last affirmed this fact is accurate — the
+    # freshness/honesty signal (D5). Set to now on creation (adding = confirming);
+    # bumped by an explicit /confirm and by any value/type edit (editing re-affirms
+    # it). Per-fact, NOT per-person, so re-confirming one fact never resets another.
+    last_confirmed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_now
+    )
 
     person: Mapped[Person] = relationship("Person", back_populates="medical_facts")
 

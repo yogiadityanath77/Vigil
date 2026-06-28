@@ -158,6 +158,16 @@ def update_fact(
     return person_service.update_fact(db, fact, data)
 
 
+@router.post("/persons/{person_id}/facts/{fact_id}/confirm", response_model=FactRead)
+def confirm_fact(
+    person_id: uuid.UUID, fact_id: uuid.UUID, db: Session = Depends(get_db)
+) -> MedicalFact:
+    """Re-affirm a fact is still accurate (bumps last_confirmed_at to now)."""
+    _get_person_or_404(db, person_id)
+    fact = _get_fact_or_404(db, fact_id, person_id)
+    return person_service.confirm_fact(db, fact)
+
+
 @router.delete(
     "/persons/{person_id}/facts/{fact_id}", status_code=status.HTTP_204_NO_CONTENT
 )

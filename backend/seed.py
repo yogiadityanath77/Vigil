@@ -10,11 +10,12 @@ Uses FAKE data only. Never put real medical or insurance data in a
 learning prototype that has no real access controls.
 """
 import sys
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
 from app.db import SessionLocal
-from app.models.person import FactType, Person
+from app.models.person import FactType, MedicalFact, Person
 from app.schemas.coordinator import (
     ContactCreate,
     FactCreate,
@@ -27,6 +28,17 @@ from app.services.person_service import (
     create_person,
     set_insurance,
 )
+
+
+def _backdate_fact(db, person: Person, value: str, days: int) -> None:
+    """Set a fact's last_confirmed_at into the past, to demo the freshness signal."""
+    fact = db.execute(
+        select(MedicalFact).where(
+            MedicalFact.person_id == person.id, MedicalFact.value == value
+        )
+    ).scalar_one()
+    fact.last_confirmed_at = datetime.now(timezone.utc) - timedelta(days=days)
+    db.commit()
 
 
 def _get_or_create(db, full_name: str) -> tuple[Person, bool]:
@@ -57,6 +69,10 @@ def seed() -> None:
                 FactCreate(type=FactType.condition, value="Hypertension"),
             ]:
                 add_fact(db, person, fact)
+            # Backdate a couple of facts so the demo shows the freshness signal as
+            # a fresh/stale MIX — one recently confirmed, one clearly outdated.
+            _backdate_fact(db, person, "Sulfa drugs", days=21)        # "3 weeks ago"
+            _backdate_fact(db, person, "Hypertension", days=240)      # "8 months ago" → stale
 
             add_contact(
                 db,

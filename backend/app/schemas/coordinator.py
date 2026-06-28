@@ -53,6 +53,7 @@ class FactRead(BaseModel):
     type: FactType
     value: str
     created_at: datetime
+    last_confirmed_at: datetime
 
 
 # ── Contact ─────────────────────────────────────────────────────────────────

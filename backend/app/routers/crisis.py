@@ -14,6 +14,8 @@ Security notes:
 The family roster is served from /coordinator/persons (the coordinator setup
 surface), not from a public / route. See DECISIONS.md (D6) for the rationale.
 """
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -50,7 +52,7 @@ def _get_person_by_slug(db: Session, slug: str) -> Person:
 @router.get("/c/{slug}")
 def crisis_page(slug: str, request: Request, db: Session = Depends(get_db)):
     person = _get_person_by_slug(db, slug)
-    script = build_crisis_script(person)
+    script = build_crisis_script(person, now=datetime.now(timezone.utc))
     return templates.TemplateResponse(
         request=request,
         name="crisis.html",
