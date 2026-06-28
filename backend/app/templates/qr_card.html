@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emergency QR card — {{ person.full_name }}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f4f4f5;
+      color: #111111;
+      padding: 24px 16px 48px;
+    }
+
+    .back {
+      display: block;
+      max-width: 360px;
+      margin: 0 auto 16px;
+      font-size: 0.85rem;
+      color: #555555;
+      text-decoration: none;
+    }
+
+    /* The physical card — sized to print cleanly on a small label/sticker. */
+    .card {
+      max-width: 360px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 2px solid #111111;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .alert {
+      background: #c0392b;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+
+    .qr {
+      width: 220px;
+      height: 220px;
+      margin: 0 auto 14px;
+    }
+    .qr svg { width: 100%; height: 100%; }
+
+    .name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .hint {
+      font-size: 0.9rem;
+      color: #444444;
+      margin-bottom: 12px;
+    }
+
+    .url {
+      font-size: 0.72rem;
+      color: #888888;
+      word-break: break-all;
+    }
+
+    .print-btn {
+      display: block;
+      max-width: 360px;
+      margin: 18px auto 0;
+      padding: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #ffffff;
+      background: #2980b9;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    /* Hide chrome when printing — just the card on paper. */
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      .back, .print-btn { display: none; }
+      .card { border: 2px solid #000000; }
+    }
+  </style>
+</head>
+<body>
+
+  <a class="back" href="/coordinator/family">← All members</a>
+
+  <div class="card">
+    <div class="alert">⚠ Medical Emergency — Scan Me</div>
+    <!-- Inlined so the card prints as one self-contained page. -->
+    <div class="qr">{{ qr_svg | safe }}</div>
+    <div class="name">{{ person.full_name }}</div>
+    <div class="hint">Scan with any phone camera to open the emergency page.</div>
+    <div class="url">{{ crisis_url }}</div>
+  </div>
+
+  <button class="print-btn" onclick="window.print()">Print this card</button>
+
+</body>
+</html>

@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from app.services.qr import build_qr_svg
 
 from app.db import get_db
 from app.models.person import MedicalFact, EmergencyContact, Person
@@ -70,6 +72,35 @@ def family_list_html(request: Request, db: Session = Depends(get_db)):
     ).scalars().all()
     return templates.TemplateResponse(
         request=request, name="index.html", context={"persons": persons}
+    )
+
+
+# ── QR code (coordinator setup surface; encodes the public crisis URL) ────────
+
+@router.get("/persons/{person_id}/qr.svg")
+def person_qr_svg(person_id: uuid.UUID, db: Session = Depends(get_db)) -> Response:
+    """Raw SVG QR encoding this person's crisis URL — embedded by the card page."""
+    person = _get_person_or_404(db, person_id)
+    svg = build_qr_svg(person_service.crisis_url(person.crisis_slug))
+    return Response(content=svg, media_type="image/svg+xml")
+
+
+@router.get("/persons/{person_id}/qr")
+def person_qr_card(
+    person_id: uuid.UUID, request: Request, db: Session = Depends(get_db)
+):
+    """Print-friendly QR card: the 'MEDICAL EMERGENCY — SCAN ME' physical layer."""
+    person = _get_person_or_404(db, person_id)
+    url = person_service.crisis_url(person.crisis_slug)
+    return templates.TemplateResponse(
+        request=request,
+        name="qr_card.html",
+        context={
+            "person": person,
+            "crisis_url": url,
+            # Inlined (not an <img src>) so the card prints as one self-contained page.
+            "qr_svg": build_qr_svg(url),
+        },
     )
 
 

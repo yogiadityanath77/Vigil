@@ -11,6 +11,8 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
+
 from app.models.person import EmergencyContact, FactType, Insurance, MedicalFact, Person
 from app.schemas.coordinator import (
     ContactCreate,
@@ -26,6 +28,15 @@ from app.schemas.coordinator import (
 
 def generate_crisis_slug() -> str:
     return secrets.token_urlsafe(8)
+
+
+def crisis_url(slug: str) -> str:
+    """
+    Build the full public crisis URL for a slug. Centralized here (next to slug
+    generation) so the `{base_url}/c/{slug}` shape is never hand-assembled — the
+    QR encodes exactly this, and the route is /c/{slug} in routers/crisis.py.
+    """
+    return f"{settings.base_url.rstrip('/')}/c/{slug}"
 
 
 # ── Person ───────────────────────────────────────────────────────────────────

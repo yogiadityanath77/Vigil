@@ -297,3 +297,32 @@ class TestInsuranceEndpoints:
         resp = client.get(f"/coordinator/persons/{person.id}")
         assert resp.status_code == 200
         assert resp.json()["insurance"]["provider"] == "Star Health"
+
+
+# ── QR code ───────────────────────────────────────────────────────────────────
+
+class TestQrEndpoints:
+
+    def test_qr_svg_returns_svg(self, person):
+        resp = client.get(f"/coordinator/persons/{person.id}/qr.svg")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("image/svg+xml")
+        assert "<svg" in resp.text
+
+    def test_qr_svg_404_for_unknown_person(self):
+        import uuid
+        resp = client.get(f"/coordinator/persons/{uuid.uuid4()}/qr.svg")
+        assert resp.status_code == 404
+
+    def test_qr_card_page_shows_crisis_url_and_label(self, person):
+        resp = client.get(f"/coordinator/persons/{person.id}/qr")
+        assert resp.status_code == 200
+        # The card carries the physical-layer label and the encoded crisis URL.
+        assert "SCAN ME" in resp.text.upper()
+        assert f"/c/{person.crisis_slug}" in resp.text
+        assert "<svg" in resp.text  # QR inlined for self-contained printing
+
+    def test_qr_card_404_for_unknown_person(self):
+        import uuid
+        resp = client.get(f"/coordinator/persons/{uuid.uuid4()}/qr")
+        assert resp.status_code == 404

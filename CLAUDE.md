@@ -65,4 +65,9 @@ This is a LEARNING PROTOTYPE, built strictly one slice at a time. Not production
   - transform.py composes a deterministic money guard-rail (cashless → "don't pay
     upfront"; otherwise "keep every bill"); rendered as crisis script Step 3
   - 47 tests passing (was 30); seed gives both members an insurance row
-- NEXT → Slice 6: generate a QR code per person from the crisis URL
+- Slice 6 (QR code per person from the crisis URL): DONE
+  - `qrcode` dep (SVG, no Pillow); isolated app/services/qr.py
+  - Endpoints: GET /coordinator/persons/{id}/qr.svg (image) + /qr (printable card)
+  - `base_url` config setting builds {base_url}/c/{slug}; crisis_url() centralized
+  - Roster links to each card; 54 tests passing (was 47); no schema change
+- NEXT → Slice 7: "Notify family" button (simulated send + browser location + secure link)

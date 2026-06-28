@@ -51,6 +51,12 @@
       font-weight: 600;
     }
 
+    .actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
     .crisis-link {
       font-size: 0.85rem;
       color: #c0392b;
@@ -63,6 +69,21 @@
 
     .crisis-link:hover {
       background: #c0392b;
+      color: #ffffff;
+    }
+
+    .qr-link {
+      font-size: 0.85rem;
+      color: #2980b9;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 6px 12px;
+      border: 1px solid #2980b9;
+      border-radius: 4px;
+    }
+
+    .qr-link:hover {
+      background: #2980b9;
       color: #ffffff;
     }
 
@@ -82,7 +103,10 @@
       {% for person in persons %}
         <li>
           <span class="member-name">{{ person.full_name }}</span>
-          <a class="crisis-link" href="/c/{{ person.crisis_slug }}">Crisis page</a>
+          <span class="actions">
+            <a class="qr-link" href="/coordinator/persons/{{ person.id }}/qr">QR card</a>
+            <a class="crisis-link" href="/c/{{ person.crisis_slug }}">Crisis page</a>
+          </span>
         </li>
       {% endfor %}
     </ul>
