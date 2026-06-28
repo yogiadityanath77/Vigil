@@ -21,6 +21,21 @@ from app.models.person import FactType
 
 
 @dataclass
+class GuardRail:
+    """
+    The money/insurance guard-rail — pre-composed instructions for a responder
+    so they don't pay upfront or miss a cashless benefit. Plain data, no model.
+
+    `headline` is the single loud instruction; `detail` carries the policy to
+    show at the desk; `hospital_line` is an optional "where to go" hint.
+    """
+
+    headline: str
+    detail: str
+    hospital_line: str | None
+
+
+@dataclass
 class CrisisScript:
     """The composed crisis script — one value object, ready to render."""
 
@@ -35,9 +50,16 @@ class CrisisScript:
     # allergies first (highest urgency), then medications, then conditions.
     doctor_lines: list[str] = field(default_factory=list)
 
+    # The money guard-rail (insurance). None when no insurance is on file.
+    guard_rail: GuardRail | None = None
+
     @property
     def has_medical_info(self) -> bool:
         return bool(self.doctor_lines)
+
+    @property
+    def has_guard_rail(self) -> bool:
+        return self.guard_rail is not None
 
 
 def build_crisis_script(person: "Person") -> CrisisScript:
@@ -69,10 +91,42 @@ def build_crisis_script(person: "Person") -> CrisisScript:
     for condition in buckets[FactType.condition]:
         doctor_lines.append(f"They have {condition}.")
 
+    # ── Money guard-rail (insurance) ────────────────────────────────────────
+    guard_rail = _build_guard_rail(person.insurance)
+
     return CrisisScript(
         person_name=person.full_name,
         call_name=primary.name if primary else "No contact listed",
         call_phone=primary.phone if primary else "",
         call_relation=primary.relation if primary else None,
         doctor_lines=doctor_lines,
+        guard_rail=guard_rail,
     )
+
+
+def _build_guard_rail(insurance) -> GuardRail | None:
+    """
+    Compose the money guard-rail from the insurance row. Pure templating — the
+    `cashless` flag decides the instruction:
+      - cashless  → "don't pay upfront" (the signature guard-rail line)
+      - otherwise → "keep every bill for reimbursement"
+    Returns None when there is no insurance on file (template omits the block).
+    """
+    if insurance is None:
+        return None
+
+    if insurance.cashless:
+        headline = "Covered as cashless — don't pay upfront."
+        detail = (
+            f"Show this policy at the hospital desk: "
+            f"{insurance.provider}, policy {insurance.policy_number}."
+        )
+    else:
+        headline = f"Insured with {insurance.provider} — keep every bill for reimbursement."
+        detail = f"Policy {insurance.policy_number}."
+
+    hospital_line = None
+    if insurance.hospital_preference:
+        hospital_line = f"If there's a choice, prefer {insurance.hospital_preference}."
+
+    return GuardRail(headline=headline, detail=detail, hospital_line=hospital_line)

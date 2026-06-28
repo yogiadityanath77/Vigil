@@ -58,4 +58,11 @@ This is a LEARNING PROTOTYPE, built strictly one slice at a time. Not production
   - Endpoints: POST/GET/PATCH persons; POST/PATCH/DELETE facts; POST/PATCH/DELETE contacts
   - Granular identity-preserving edits (D5); slug generation centralized
   - 16 tests + all existing tests passing; no schema migrations needed
-- NEXT → Slice 4: add second family member (list view + per-person crisis URLs)
+- Slice 4 (second family member — list view + per-person crisis URLs): DONE
+- Slice 5 (logistics field + guard-rail line): DONE
+  - New `insurance` table (one-to-one per person; migration 0002); D7 logged
+  - Endpoints: PUT-upsert / PATCH / GET /coordinator/persons/{id}/insurance
+  - transform.py composes a deterministic money guard-rail (cashless → "don't pay
+    upfront"; otherwise "keep every bill"); rendered as crisis script Step 3
+  - 47 tests passing (was 30); seed gives both members an insurance row
+- NEXT → Slice 6: generate a QR code per person from the crisis URL

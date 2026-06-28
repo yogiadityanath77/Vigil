@@ -13,9 +13,19 @@ from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.main import app
-from app.schemas.coordinator import ContactCreate, FactCreate, PersonCreate
+from app.schemas.coordinator import (
+    ContactCreate,
+    FactCreate,
+    InsuranceCreate,
+    PersonCreate,
+)
 from app.models.person import FactType
-from app.services.person_service import add_contact, add_fact, create_person
+from app.services.person_service import (
+    add_contact,
+    add_fact,
+    create_person,
+    set_insurance,
+)
 
 client = TestClient(app)
 
@@ -32,6 +42,11 @@ def two_persons(db: Session):
     p1 = create_person(db, PersonCreate(full_name="Test Alice"))
     add_fact(db, p1, FactCreate(type=FactType.allergy, value="Penicillin"))
     add_contact(db, p1, ContactCreate(name="Bob", phone="111", relation="spouse", notify_order=1))
+    set_insurance(
+        db,
+        p1,
+        InsuranceCreate(provider="Star Health", policy_number="SH-CRISIS-1", cashless=True),
+    )
 
     p2 = create_person(db, PersonCreate(full_name="Test Bob"))
     add_fact(db, p2, FactCreate(type=FactType.condition, value="Asthma"))
@@ -58,6 +73,23 @@ def test_crisis_page_renders_for_second_person(two_persons):
     assert resp.status_code == 200
     assert p2.full_name in resp.text
     assert "Asthma" in resp.text
+
+
+def test_crisis_page_renders_guard_rail_for_insured_person(two_persons):
+    p1, _ = two_persons
+    resp = client.get(f"/c/{p1.crisis_slug}")
+    assert resp.status_code == 200
+    # The signature money guard-rail line + the policy to show at the desk.
+    # (The apostrophe in "don't" is HTML-escaped, so match on "pay upfront".)
+    assert "pay upfront" in resp.text.lower()
+    assert "SH-CRISIS-1" in resp.text
+
+
+def test_crisis_page_omits_guard_rail_when_no_insurance(two_persons):
+    _, p2 = two_persons  # p2 has no insurance row
+    resp = client.get(f"/c/{p2.crisis_slug}")
+    assert resp.status_code == 200
+    assert "Before you pay" not in resp.text
 
 
 def test_crisis_page_404_on_unknown_slug():

@@ -116,6 +116,76 @@ class ContactRead(BaseModel):
     created_at: datetime
 
 
+# ── Insurance (one-to-one logistics tier) ────────────────────────────────────
+
+class InsuranceCreate(BaseModel):
+    """Body for PUT (upsert) — all required fields must be present."""
+
+    provider: str
+    policy_number: str
+    hospital_preference: str | None = None
+    cashless: bool = True
+
+    @field_validator("provider", "policy_number")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("must not be blank")
+        return v.strip()
+
+    @field_validator("hospital_preference")
+    @classmethod
+    def strip_optional(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        return v or None
+
+
+class InsuranceUpdate(BaseModel):
+    """Body for PATCH — partial update of an existing insurance row."""
+
+    provider: str | None = None
+    policy_number: str | None = None
+    hospital_preference: str | None = None
+    cashless: bool | None = None
+
+    @field_validator("provider", "policy_number")
+    @classmethod
+    def not_empty(cls, v: str | None) -> str | None:
+        if v is not None and not v.strip():
+            raise ValueError("must not be blank")
+        return v.strip() if v is not None else v
+
+    @field_validator("hospital_preference")
+    @classmethod
+    def strip_optional(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        return v or None
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> InsuranceUpdate:
+        if all(
+            f is None
+            for f in (self.provider, self.policy_number, self.hospital_preference, self.cashless)
+        ):
+            raise ValueError("at least one field must be provided")
+        return self
+
+
+class InsuranceRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    provider: str
+    policy_number: str
+    hospital_preference: str | None
+    cashless: bool
+    created_at: datetime
+
+
 # ── Person ───────────────────────────────────────────────────────────────────
 
 class PersonCreate(BaseModel):
@@ -149,3 +219,4 @@ class PersonRead(BaseModel):
     created_at: datetime
     medical_facts: list[FactRead]
     emergency_contacts: list[ContactRead]
+    insurance: InsuranceRead | None

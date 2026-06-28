@@ -220,3 +220,80 @@ class TestContactEndpoints:
         assert resp.status_code == 404
         db.delete(other)
         db.commit()
+
+
+# ── Insurance (one-to-one; PUT upsert + PATCH) ────────────────────────────────
+
+class TestInsuranceEndpoints:
+
+    def test_get_insurance_404_when_none(self, person):
+        resp = client.get(f"/coordinator/persons/{person.id}/insurance")
+        assert resp.status_code == 404
+
+    def test_put_creates_insurance(self, person):
+        resp = client.put(
+            f"/coordinator/persons/{person.id}/insurance",
+            json={
+                "provider": "Star Health",
+                "policy_number": "SH-1",
+                "hospital_preference": "Apollo",
+                "cashless": True,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["provider"] == "Star Health"
+        assert body["cashless"] is True
+
+    def test_put_is_upsert_replaces_existing(self, person):
+        client.put(
+            f"/coordinator/persons/{person.id}/insurance",
+            json={"provider": "Star Health", "policy_number": "SH-1", "cashless": True},
+        )
+        resp = client.put(
+            f"/coordinator/persons/{person.id}/insurance",
+            json={"provider": "HDFC Ergo", "policy_number": "HE-2", "cashless": False},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["provider"] == "HDFC Ergo"
+        assert body["cashless"] is False
+        # still exactly one row reachable via GET
+        get = client.get(f"/coordinator/persons/{person.id}/insurance")
+        assert get.json()["policy_number"] == "HE-2"
+
+    def test_patch_updates_partial(self, person):
+        client.put(
+            f"/coordinator/persons/{person.id}/insurance",
+            json={"provider": "Star Health", "policy_number": "SH-1", "cashless": True},
+        )
+        resp = client.patch(
+            f"/coordinator/persons/{person.id}/insurance",
+            json={"cashless": False},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["cashless"] is False
+        assert body["provider"] == "Star Health"  # unchanged
+
+    def test_patch_404_when_no_insurance(self, person):
+        resp = client.patch(
+            f"/coordinator/persons/{person.id}/insurance", json={"cashless": False}
+        )
+        assert resp.status_code == 404
+
+    def test_put_blank_provider_returns_422(self, person):
+        resp = client.put(
+            f"/coordinator/persons/{person.id}/insurance",
+            json={"provider": "  ", "policy_number": "SH-1"},
+        )
+        assert resp.status_code == 422
+
+    def test_person_read_includes_insurance(self, person):
+        client.put(
+            f"/coordinator/persons/{person.id}/insurance",
+            json={"provider": "Star Health", "policy_number": "SH-1", "cashless": True},
+        )
+        resp = client.get(f"/coordinator/persons/{person.id}")
+        assert resp.status_code == 200
+        assert resp.json()["insurance"]["provider"] == "Star Health"

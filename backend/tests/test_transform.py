@@ -19,8 +19,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.models.person import EmergencyContact, FactType, MedicalFact, Person
-from app.services.transform import CrisisScript, build_crisis_script
+from app.models.person import EmergencyContact, FactType, Insurance, MedicalFact, Person
+from app.services.transform import CrisisScript, GuardRail, build_crisis_script
 
 
 def _now() -> datetime:
@@ -31,6 +31,7 @@ def _make_person(
     full_name: str = "Test Person",
     facts: list[MedicalFact] | None = None,
     contacts: list[EmergencyContact] | None = None,
+    insurance: Insurance | None = None,
 ) -> Person:
     """Construct a detached Person instance for testing — no session needed."""
     person = Person(
@@ -42,7 +43,24 @@ def _make_person(
     # Explicitly set relationship attributes to bypass lazy-loading.
     person.medical_facts = facts or []
     person.emergency_contacts = contacts or []
+    person.insurance = insurance
     return person
+
+
+def _insurance(
+    provider: str = "Star Health",
+    policy_number: str = "SH-123",
+    hospital_preference: str | None = None,
+    cashless: bool = True,
+) -> Insurance:
+    return Insurance(
+        id=uuid.uuid4(),
+        provider=provider,
+        policy_number=policy_number,
+        hospital_preference=hospital_preference,
+        cashless=cashless,
+        created_at=_now(),
+    )
 
 
 def _fact(type: FactType, value: str) -> MedicalFact:
@@ -143,3 +161,50 @@ class TestBuildCrisisScript:
         person = _make_person(facts=[_fact(FactType.allergy, "Aspirin")])
         script = build_crisis_script(person)
         assert script.has_medical_info
+
+
+class TestGuardRail:
+    """The money/insurance guard-rail composition (Slice 5)."""
+
+    def test_no_insurance_gives_no_guard_rail(self):
+        person = _make_person(insurance=None)
+        script = build_crisis_script(person)
+        assert script.guard_rail is None
+        assert not script.has_guard_rail
+
+    def test_cashless_headline_says_dont_pay_upfront(self):
+        person = _make_person(insurance=_insurance(cashless=True))
+        script = build_crisis_script(person)
+        assert script.has_guard_rail
+        assert isinstance(script.guard_rail, GuardRail)
+        assert "don't pay upfront" in script.guard_rail.headline.lower()
+
+    def test_cashless_detail_shows_provider_and_policy(self):
+        person = _make_person(
+            insurance=_insurance(provider="Star Health", policy_number="SH-999")
+        )
+        script = build_crisis_script(person)
+        assert "Star Health" in script.guard_rail.detail
+        assert "SH-999" in script.guard_rail.detail
+
+    def test_non_cashless_headline_says_keep_bills(self):
+        person = _make_person(
+            insurance=_insurance(provider="HDFC Ergo", cashless=False)
+        )
+        script = build_crisis_script(person)
+        assert "HDFC Ergo" in script.guard_rail.headline
+        assert "reimbursement" in script.guard_rail.headline.lower()
+        assert "don't pay upfront" not in script.guard_rail.headline.lower()
+
+    def test_hospital_preference_rendered_when_present(self):
+        person = _make_person(
+            insurance=_insurance(hospital_preference="Apollo, Jubilee Hills")
+        )
+        script = build_crisis_script(person)
+        assert script.guard_rail.hospital_line is not None
+        assert "Apollo, Jubilee Hills" in script.guard_rail.hospital_line
+
+    def test_no_hospital_preference_gives_none_hospital_line(self):
+        person = _make_person(insurance=_insurance(hospital_preference=None))
+        script = build_crisis_script(person)
+        assert script.guard_rail.hospital_line is None

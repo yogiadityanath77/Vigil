@@ -48,3 +48,19 @@ foundational "two surfaces" separation (prototype-spec.md:21).
 **In the prototype:** both surfaces are local-only and unauthenticated (no real auth yet).
 The separation is architectural, not enforced, and makes room for real auth + tiering later.
 **Affects:** API surface (coordinator is `/coordinator/*`); later slice when real auth arrives.
+
+## D7 — Insurance is one-to-one with a person; edited via PUT-upsert + PATCH (not the D5 collection pattern)
+The insurance row is a single logistics record per person (`relationship(uselist=False)`,
+unique FK on `insurance.person_id`). It is NOT a granular collection like medical_facts /
+emergency_contacts, so D5's per-item POST/PATCH/DELETE does not apply.
+**Endpoints:** `PUT /coordinator/persons/{id}/insurance` create-or-replaces the single row;
+`PATCH` does a partial update; `GET` reads it (404 when none on file).
+**Why:** a singleton resource maps cleanly to PUT (idempotent upsert) — adding a collection-style
+POST would imply multiple insurance rows, which the unique constraint forbids. The PUT path is
+identity-preserving on update (it mutates the existing row rather than delete+recreate), so a
+future per-record `last_confirmed_at` (slice 8) survives — consistent with the *spirit* of D5
+even though the endpoint shape differs.
+**Crisis surface:** the row becomes a deterministic "money guard-rail" in transform.py — the
+`cashless` flag chooses "don't pay upfront" vs. "keep every bill for reimbursement." No LLM
+in this path (D3). Rendered as a third script step, after the clinical "tell the doctor" lines.
+**Affects:** slice 5 schema + endpoints; slice 8 (confidence timestamps); the transform's growth.

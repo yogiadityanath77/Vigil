@@ -15,8 +15,18 @@ from sqlalchemy import select
 
 from app.db import SessionLocal
 from app.models.person import FactType, Person
-from app.schemas.coordinator import ContactCreate, FactCreate, PersonCreate
-from app.services.person_service import add_contact, add_fact, create_person
+from app.schemas.coordinator import (
+    ContactCreate,
+    FactCreate,
+    InsuranceCreate,
+    PersonCreate,
+)
+from app.services.person_service import (
+    add_contact,
+    add_fact,
+    create_person,
+    set_insurance,
+)
 
 
 def _get_or_create(db, full_name: str) -> tuple[Person, bool]:
@@ -58,6 +68,16 @@ def seed() -> None:
                     notify_order=1,
                 ),
             )
+            set_insurance(
+                db,
+                person,
+                InsuranceCreate(
+                    provider="Star Health",
+                    policy_number="SH-IND-4471902",
+                    hospital_preference="Apollo Hospital, Jubilee Hills",
+                    cashless=True,
+                ),
+            )
             print(f"[OK] Seeded: {person.full_name}")
             print(f"  Crisis URL -> http://localhost:8000/c/{person.crisis_slug}")
 
@@ -80,6 +100,16 @@ def seed() -> None:
                     phone="+91 87654 32109",
                     relation="wife",
                     notify_order=1,
+                ),
+            )
+            set_insurance(
+                db,
+                person2,
+                InsuranceCreate(
+                    provider="HDFC Ergo",
+                    policy_number="HE-IND-8830245",
+                    hospital_preference=None,
+                    cashless=False,
                 ),
             )
             print(f"[OK] Seeded: {person2.full_name}")

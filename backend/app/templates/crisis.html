@@ -96,6 +96,31 @@
       font-style: italic;
       font-size: 0.95rem;
     }
+
+    /* ── Money guard-rail ─────────────────────────────────────────── */
+    .guard-rail {
+      background: #fef6e6;
+      border: 1px solid #e0a800;
+      border-left: 4px solid #e0a800;
+      border-radius: 0 6px 6px 0;
+      padding: 14px 16px;
+      margin-top: 4px;
+    }
+    .guard-rail .headline {
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: #7a5c00;
+      margin-bottom: 6px;
+    }
+    .guard-rail .detail {
+      font-size: 0.98rem;
+      color: #4a4a4a;
+    }
+    .guard-rail .hospital {
+      margin-top: 8px;
+      font-size: 0.98rem;
+      color: #4a4a4a;
+    }
   </style>
 </head>
 <body>
@@ -135,6 +160,20 @@
       <div class="no-info">No medical alerts on file.</div>
     {% endif %}
   </div>
+
+  <!-- Step 3: Money / insurance guard-rail -->
+  {% if script.has_guard_rail %}
+  <div class="step">
+    <div class="step-label">Step 3 — Before you pay</div>
+    <div class="guard-rail">
+      <div class="headline">{{ script.guard_rail.headline }}</div>
+      <div class="detail">{{ script.guard_rail.detail }}</div>
+      {% if script.guard_rail.hospital_line %}
+        <div class="hospital">{{ script.guard_rail.hospital_line }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 
 </body>
 </html>

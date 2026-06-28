@@ -35,6 +35,7 @@ def crisis_page(slug: str, request: Request, db: Session = Depends(get_db)):
         .options(
             selectinload(Person.medical_facts),
             selectinload(Person.emergency_contacts),
+            selectinload(Person.insurance),
         )
     )
     person = db.execute(stmt).scalar_one_or_none()

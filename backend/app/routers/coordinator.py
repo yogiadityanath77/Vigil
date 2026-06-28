@@ -22,6 +22,9 @@ from app.schemas.coordinator import (
     FactCreate,
     FactRead,
     FactUpdate,
+    InsuranceCreate,
+    InsuranceRead,
+    InsuranceUpdate,
     PersonCreate,
     PersonRead,
     PersonUpdate,
@@ -170,3 +173,38 @@ def delete_contact(
     _get_person_or_404(db, person_id)
     contact = _get_contact_or_404(db, contact_id, person_id)
     person_service.delete_contact(db, contact)
+
+
+# ── Insurance endpoints (one-to-one; PUT upsert + PATCH, see D7) ───────────────
+
+@router.get("/persons/{person_id}/insurance", response_model=InsuranceRead)
+def get_insurance(person_id: uuid.UUID, db: Session = Depends(get_db)):
+    person = _get_person_or_404(db, person_id)
+    insurance = person_service.get_insurance(db, person)
+    if insurance is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No insurance on file"
+        )
+    return insurance
+
+
+@router.put("/persons/{person_id}/insurance", response_model=InsuranceRead)
+def put_insurance(
+    person_id: uuid.UUID, data: InsuranceCreate, db: Session = Depends(get_db)
+):
+    """Create-or-replace the single insurance row for this person."""
+    person = _get_person_or_404(db, person_id)
+    return person_service.set_insurance(db, person, data)
+
+
+@router.patch("/persons/{person_id}/insurance", response_model=InsuranceRead)
+def patch_insurance(
+    person_id: uuid.UUID, data: InsuranceUpdate, db: Session = Depends(get_db)
+):
+    person = _get_person_or_404(db, person_id)
+    insurance = person_service.get_insurance(db, person)
+    if insurance is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No insurance on file"
+        )
+    return person_service.update_insurance(db, insurance, data)

@@ -11,12 +11,14 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.models.person import EmergencyContact, FactType, MedicalFact, Person
+from app.models.person import EmergencyContact, FactType, Insurance, MedicalFact, Person
 from app.schemas.coordinator import (
     ContactCreate,
     ContactUpdate,
     FactCreate,
     FactUpdate,
+    InsuranceCreate,
+    InsuranceUpdate,
     PersonCreate,
     PersonUpdate,
 )
@@ -121,3 +123,42 @@ def update_contact(db: Session, contact: EmergencyContact, data: ContactUpdate) 
 def delete_contact(db: Session, contact: EmergencyContact) -> None:
     db.delete(contact)
     db.commit()
+
+
+# ── Insurance (one-to-one) ────────────────────────────────────────────────────
+
+def get_insurance(db: Session, person: Person) -> Insurance | None:
+    return person.insurance
+
+
+def set_insurance(db: Session, person: Person, data: InsuranceCreate) -> Insurance:
+    """
+    Upsert the single insurance row (backs PUT). If one exists, replace every
+    field; otherwise create it. Identity-preserving on update so a future
+    `last_confirmed_at` (slice 8) survives — consistent with the spirit of D5.
+    """
+    insurance = person.insurance
+    if insurance is None:
+        insurance = Insurance(person_id=person.id)
+        db.add(insurance)
+    insurance.provider = data.provider
+    insurance.policy_number = data.policy_number
+    insurance.hospital_preference = data.hospital_preference
+    insurance.cashless = data.cashless
+    db.commit()
+    db.refresh(insurance)
+    return insurance
+
+
+def update_insurance(db: Session, insurance: Insurance, data: InsuranceUpdate) -> Insurance:
+    if data.provider is not None:
+        insurance.provider = data.provider
+    if data.policy_number is not None:
+        insurance.policy_number = data.policy_number
+    if data.hospital_preference is not None:
+        insurance.hospital_preference = data.hospital_preference
+    if data.cashless is not None:
+        insurance.cashless = data.cashless
+    db.commit()
+    db.refresh(insurance)
+    return insurance
