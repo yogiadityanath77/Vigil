@@ -41,6 +41,35 @@ def person(db: Session):
 
 class TestPersonEndpoints:
 
+    def test_list_persons_returns_200(self):
+        """Verify list endpoint returns 200 and a list (may include seeded data)."""
+        resp = client.get("/coordinator/persons")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert isinstance(body, list)
+        # At minimum, verify structure if any persons exist
+        if body:
+            assert "id" in body[0]
+            assert "full_name" in body[0]
+            assert "crisis_slug" in body[0]
+
+    def test_list_persons_shows_multiple(self):
+        with SessionLocal() as db:
+            p1 = create_person(db, PersonCreate(full_name="Alice List Test"))
+            p2 = create_person(db, PersonCreate(full_name="Bob List Test"))
+
+            resp = client.get("/coordinator/persons")
+            assert resp.status_code == 200
+            body = resp.json()
+            assert len(body) >= 2
+            names = [p["full_name"] for p in body]
+            assert "Alice List Test" in names
+            assert "Bob List Test" in names
+
+            db.delete(p1)
+            db.delete(p2)
+            db.commit()
+
     def test_create_person_returns_201(self):
         resp = client.post("/coordinator/persons", json={"full_name": "Jane Doe"})
         assert resp.status_code == 201

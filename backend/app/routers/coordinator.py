@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -27,6 +29,7 @@ from app.schemas.coordinator import (
 from app.services import person_service
 
 router = APIRouter(prefix="/coordinator", tags=["coordinator"])
+templates = Jinja2Templates(directory="app/templates")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -54,11 +57,32 @@ def _get_contact_or_404(
     return contact
 
 
+# ── HTML Coordinator Pages ──────────────────────────────────────────────────────
+
+@router.get("/family")
+def family_list_html(request: Request, db: Session = Depends(get_db)):
+    """Renders the family roster (HTML coordinator surface, not public crisis page)."""
+    persons = db.execute(
+        select(Person).order_by(Person.full_name)
+    ).scalars().all()
+    return templates.TemplateResponse(
+        request=request, name="index.html", context={"persons": persons}
+    )
+
+
 # ── Person endpoints ──────────────────────────────────────────────────────────
 
 @router.post("/persons", response_model=PersonRead, status_code=status.HTTP_201_CREATED)
 def create_person(data: PersonCreate, db: Session = Depends(get_db)) -> Person:
     return person_service.create_person(db, data)
+
+
+@router.get("/persons", response_model=list[PersonRead])
+def list_persons(db: Session = Depends(get_db)) -> list[Person]:
+    persons = db.execute(
+        select(Person).order_by(Person.full_name)
+    ).scalars().all()
+    return persons
 
 
 @router.get("/persons/{person_id}", response_model=PersonRead)

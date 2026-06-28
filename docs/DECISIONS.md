@@ -37,3 +37,14 @@ freshness signal — which is a core concept. Confidence metadata requires stabl
 **Trade-off:** a form save becomes several calls (chattier). That's a frontend concern, solvable
 later with a batch endpoint; the backend resource model respects identity now.
 **Affects:** slice 3 endpoint design; slice 8 (confidence timestamps).
+
+## D6 — Family roster lives on the coordinator surface, not public crisis
+The family roster (listing all persons with their crisis_slugs) is served from
+`GET /coordinator/persons`, not from a public `/` route.
+**Why:** D4 treats the crisis_slug as an unguessable capability; publishing all slugs at a
+public endpoint undermines that. Listing all family members is a coordinator setup activity
+(calm mode), separate from the public crisis surface (/c/{slug}). This mirrors the prototype's
+foundational "two surfaces" separation (prototype-spec.md:21).
+**In the prototype:** both surfaces are local-only and unauthenticated (no real auth yet).
+The separation is architectural, not enforced, and makes room for real auth + tiering later.
+**Affects:** API surface (coordinator is `/coordinator/*`); later slice when real auth arrives.

@@ -1,16 +1,18 @@
 """
-crisis.py — the one public route for slice 1.
+crisis.py — public crisis routes.
 
-GET /c/{slug}  →  renders the crisis page for the person with that slug.
+GET /c/{slug} →  crisis page for the person with that slug
 
 Security notes:
   - The slug is the only "auth" at this layer. It must be unguessable (generated
-    with secrets.token_urlsafe) — that guarantee lives in seed.py / coordinator
-    creation, not here.
+    with secrets.token_urlsafe) — that guarantee lives in coordinator creation.
   - We return a plain 404 on miss — no detail that distinguishes "slug not found"
     from "bad slug format." Don't give an attacker information about slug space.
   - selectinload eagerly fetches relationships in a single extra query each,
     avoiding the N+1 that lazy-loading would cause per fact/contact row.
+
+The family roster is served from /coordinator/persons (the coordinator setup
+surface), not from a public / route. See DECISIONS.md (D6) for the rationale.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.templating import Jinja2Templates
@@ -42,5 +44,5 @@ def crisis_page(slug: str, request: Request, db: Session = Depends(get_db)):
 
     script = build_crisis_script(person)
     return templates.TemplateResponse(
-    request=request, name="crisis.html", context={"script": script}
-)
+        request=request, name="crisis.html", context={"script": script}
+    )
