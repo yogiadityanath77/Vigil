@@ -121,6 +121,60 @@
       font-size: 0.98rem;
       color: #4a4a4a;
     }
+
+    /* ── Notify family ────────────────────────────────────────────── */
+    .notify-btn {
+      display: block;
+      width: 100%;
+      margin-top: 8px;
+      padding: 16px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #ffffff;
+      background: #1a7a3c;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .notify-btn:hover { background: #156330; }
+    .notify-btn:disabled { background: #9bbfa7; cursor: default; }
+
+    .notify-status {
+      margin-top: 10px;
+      font-size: 0.95rem;
+      color: #555555;
+    }
+
+    .sent-panel {
+      margin-top: 12px;
+      background: #eef7f0;
+      border: 1px solid #1a7a3c;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .sent-panel .sent-head {
+      font-weight: 700;
+      color: #156330;
+      margin-bottom: 10px;
+    }
+    .sent-panel .map-link {
+      display: inline-block;
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+      color: #1a5276;
+    }
+    .sent-msg {
+      padding: 10px 0;
+      border-top: 1px solid #d4e8da;
+      font-size: 0.95rem;
+    }
+    .sent-msg .who { font-weight: 600; }
+    .sent-msg .body {
+      margin-top: 4px;
+      color: #444444;
+      font-size: 0.9rem;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -161,19 +215,113 @@
     {% endif %}
   </div>
 
-  <!-- Step 3: Money / insurance guard-rail -->
-  {% if script.has_guard_rail %}
+  <!-- Step 3: Money / insurance guard-rail. Always rendered (with a fallback,
+       like Step 2) so the step numbering never gaps when insurance is absent. -->
   <div class="step">
     <div class="step-label">Step 3 — Before you pay</div>
-    <div class="guard-rail">
-      <div class="headline">{{ script.guard_rail.headline }}</div>
-      <div class="detail">{{ script.guard_rail.detail }}</div>
-      {% if script.guard_rail.hospital_line %}
-        <div class="hospital">{{ script.guard_rail.hospital_line }}</div>
-      {% endif %}
-    </div>
+    {% if script.has_guard_rail %}
+      <div class="guard-rail">
+        <div class="headline">{{ script.guard_rail.headline }}</div>
+        <div class="detail">{{ script.guard_rail.detail }}</div>
+        {% if script.guard_rail.hospital_line %}
+          <div class="hospital">{{ script.guard_rail.hospital_line }}</div>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="no-info">No insurance details on file.</div>
+    {% endif %}
   </div>
-  {% endif %}
+
+  <!-- Step 4: Notify the family -->
+  <div class="step">
+    <div class="step-label">Step 4 — Tell the family</div>
+    <button class="notify-btn" id="notify-btn">🔔 Notify family</button>
+    <div class="notify-status" id="notify-status"></div>
+    <div class="sent-panel" id="sent-panel" style="display:none;"></div>
+  </div>
+
+  <script>
+    (function () {
+      var btn = document.getElementById("notify-btn");
+      var statusEl = document.getElementById("notify-status");
+      var panel = document.getElementById("sent-panel");
+      var slug = {{ slug | tojson }};
+
+      function escapeHtml(s) {
+        var d = document.createElement("div");
+        d.textContent = s == null ? "" : s;
+        return d.innerHTML;
+      }
+
+      function send(coords) {
+        statusEl.textContent = "Sending…";
+        fetch("/c/" + encodeURIComponent(slug) + "/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(coords),
+        })
+          .then(function (r) {
+            if (!r.ok) throw new Error("Notify failed (" + r.status + ")");
+            return r.json();
+          })
+          .then(render)
+          .catch(function (err) {
+            statusEl.textContent = err.message + " — please try again.";
+            btn.disabled = false;
+          });
+      }
+
+      function render(data) {
+        statusEl.textContent = "";
+        // No contacts on file: don't claim a "sent to 0" success — say so plainly.
+        if (data.contacts.length === 0) {
+          panel.innerHTML =
+            '<div class="sent-head">No family contacts are set up for ' +
+            escapeHtml(data.person_name) + ".</div>" +
+            '<div class="map-link">Nothing was sent. Call emergency services directly.</div>';
+          panel.style.display = "block";
+          return;
+        }
+        var html = '<div class="sent-head">✓ Sent to ' +
+          data.contacts.length +
+          (data.contacts.length === 1 ? " contact" : " contacts") + "</div>";
+        if (data.map_link) {
+          html += '<a class="map-link" href="' + escapeHtml(data.map_link) +
+            '" target="_blank" rel="noopener">📍 Open shared location</a>';
+        } else {
+          html += '<div class="map-link">Location was not shared.</div>';
+        }
+        data.contacts.forEach(function (c) {
+          html += '<div class="sent-msg"><div class="who">' +
+            escapeHtml(c.name) +
+            (c.relation ? " (" + escapeHtml(c.relation) + ")" : "") +
+            " · " + escapeHtml(c.phone) + '</div>' +
+            '<div class="body">' + escapeHtml(c.message) + "</div></div>";
+        });
+        panel.innerHTML = html;
+        panel.style.display = "block";
+      }
+
+      btn.addEventListener("click", function () {
+        btn.disabled = true;
+        if (!navigator.geolocation) {
+          send({});
+          return;
+        }
+        statusEl.textContent = "Getting location…";
+        navigator.geolocation.getCurrentPosition(
+          function (pos) {
+            send({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          },
+          function () {
+            // Denied or timed out — notify anyway, without coordinates.
+            send({});
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        );
+      });
+    })();
+  </script>
 
 </body>
 </html>

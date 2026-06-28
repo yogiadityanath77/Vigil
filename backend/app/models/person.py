@@ -15,7 +15,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum as SAEnum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -63,6 +63,9 @@ class Person(Base):
         back_populates="person",
         uselist=False,
         cascade="all, delete-orphan",
+    )
+    notification_events: Mapped[list[NotificationEvent]] = relationship(
+        "NotificationEvent", back_populates="person", cascade="all, delete-orphan"
     )
 
 
@@ -142,3 +145,36 @@ class Insurance(Base):
     )
 
     person: Mapped[Person] = relationship("Person", back_populates="insurance")
+
+
+class NotificationEvent(Base):
+    """
+    Audit trail for the responder-triggered "Notify family" action — one row per
+    tap. In the prototype the send is *simulated*: we record the event (with the
+    responder's location, if granted) and `status` is always "sent". Real SMS /
+    delivery acknowledgment / escalation are later slices.
+
+    location_lat/lng are nullable: the responder may deny the browser geolocation
+    prompt, and the notify flow must still succeed without coordinates.
+    """
+
+    __tablename__ = "notification_event"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("person.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    triggered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=_now
+    )
+    location_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="sent")
+
+    person: Mapped[Person] = relationship(
+        "Person", back_populates="notification_events"
+    )

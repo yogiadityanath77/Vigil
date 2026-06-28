@@ -64,3 +64,21 @@ even though the endpoint shape differs.
 `cashless` flag chooses "don't pay upfront" vs. "keep every bill for reimbursement." No LLM
 in this path (D3). Rendered as a third script step, after the clinical "tell the doctor" lines.
 **Affects:** slice 5 schema + endpoints; slice 8 (confidence timestamps); the transform's growth.
+
+## D8 — "Notify family" is a public-crisis-surface action; send is simulated; secure link = crisis URL (for now)
+The notify trigger is `POST /c/{slug}/notify` on the public crisis router, NOT under
+`/coordinator/*`. The responder in the room triggers it, so it belongs with the responder-facing
+surface; the unguessable slug is the only gate, same as the page itself (consistent with D6's
+two-surface split and D4's slug-as-capability).
+**Simulated send:** no real SMS/WhatsApp. We persist one `notification_event` audit row per tap
+(`status="sent"`, location nullable) and return the messages that *would* be dispatched per
+contact. Message composition is a PURE function (services/notify.py), mirroring transform.py —
+"data becomes words" stays deterministic and unit-testable with no DB.
+**Location is optional:** the browser geolocation prompt can be denied/time out; the POST still
+succeeds with null coordinates and the message degrades to "Location: not shared." The flow
+never blocks on permission.
+**Secure link:** the message's "Details:" link is the crisis URL (`{base_url}/c/{slug}`) for now.
+The richer, tiered "for family" view is Slice 9; until it exists, pointing at the crisis page is
+the honest target rather than inventing a dead link.
+**Affects:** slice 7 schema/endpoint/template; slice 9 (the secure link gains a family-tier view);
+later slices for real SMS, rate-limiting, delivery-ack, and escalation.

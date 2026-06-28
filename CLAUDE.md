@@ -70,4 +70,10 @@ This is a LEARNING PROTOTYPE, built strictly one slice at a time. Not production
   - Endpoints: GET /coordinator/persons/{id}/qr.svg (image) + /qr (printable card)
   - `base_url` config setting builds {base_url}/c/{slug}; crisis_url() centralized
   - Roster links to each card; 54 tests passing (was 47); no schema change
-- NEXT → Slice 7: "Notify family" button (simulated send + browser location + secure link)
+- Slice 7 ("Notify family" button — simulated send + location + secure link): DONE
+  - New `notification_event` table (migration 0003); D8 logged
+  - Public endpoint POST /c/{slug}/notify; pure services/notify.py message builder
+  - Crisis page button → browser geolocation → AJAX → per-contact message preview
+  - Location optional (graceful when denied); secure link = crisis URL until Slice 9
+  - 68 tests passing (was 54)
+- NEXT → Slice 8: "last confirmed [date]" display on the facts

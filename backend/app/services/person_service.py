@@ -13,7 +13,14 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 
-from app.models.person import EmergencyContact, FactType, Insurance, MedicalFact, Person
+from app.models.person import (
+    EmergencyContact,
+    FactType,
+    Insurance,
+    MedicalFact,
+    NotificationEvent,
+    Person,
+)
 from app.schemas.coordinator import (
     ContactCreate,
     ContactUpdate,
@@ -173,3 +180,21 @@ def update_insurance(db: Session, insurance: Insurance, data: InsuranceUpdate) -
     db.commit()
     db.refresh(insurance)
     return insurance
+
+
+# ── Notification events (simulated "Notify family") ───────────────────────────
+
+def record_notification(
+    db: Session,
+    person: Person,
+    lat: float | None,
+    lng: float | None,
+) -> NotificationEvent:
+    """Persist the audit row for one notify tap. status is always 'sent' (simulated)."""
+    event = NotificationEvent(
+        person_id=person.id, location_lat=lat, location_lng=lng, status="sent"
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event

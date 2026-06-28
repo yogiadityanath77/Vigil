@@ -21,14 +21,17 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
 from app.models.person import Person
+from app.schemas.crisis import NotifiedContact, NotifyRequest, NotifyResponse
+from app.services import person_service
+from app.services.notify import build_notification_messages, maps_link
 from app.services.transform import build_crisis_script
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/c/{slug}")
-def crisis_page(slug: str, request: Request, db: Session = Depends(get_db)):
+def _get_person_by_slug(db: Session, slug: str) -> Person:
+    """Load a person by crisis slug with relationships, or 404 (no info leak)."""
     stmt = (
         select(Person)
         .where(Person.crisis_slug == slug)
@@ -39,11 +42,62 @@ def crisis_page(slug: str, request: Request, db: Session = Depends(get_db)):
         )
     )
     person = db.execute(stmt).scalar_one_or_none()
-
     if person is None:
         raise HTTPException(status_code=404)
+    return person
 
+
+@router.get("/c/{slug}")
+def crisis_page(slug: str, request: Request, db: Session = Depends(get_db)):
+    person = _get_person_by_slug(db, slug)
     script = build_crisis_script(person)
     return templates.TemplateResponse(
-        request=request, name="crisis.html", context={"script": script}
+        request=request,
+        name="crisis.html",
+        context={"script": script, "slug": slug},
+    )
+
+
+@router.post("/c/{slug}/notify", response_model=NotifyResponse)
+def notify_family(
+    slug: str, data: NotifyRequest, db: Session = Depends(get_db)
+) -> NotifyResponse:
+    """
+    Responder-triggered family alert. Simulated send: record the audit event and
+    return the messages that *would* be dispatched to each contact. No real SMS.
+
+    Lives on the public crisis surface (not coordinator) because the responder
+    in the room triggers it. The slug is the only gate, same as the page itself.
+    """
+    person = _get_person_by_slug(db, slug)
+
+    event = person_service.record_notification(db, person, data.lat, data.lng)
+
+    map_link = maps_link(data.lat, data.lng)
+    # The secure link is the unguessable crisis URL — the richer "for family"
+    # tiered view is Slice 9; until then this is the honest target.
+    secure_link = person_service.crisis_url(slug)
+
+    messages = build_notification_messages(
+        person_name=person.full_name,
+        contacts=person.emergency_contacts,
+        secure_link=secure_link,
+        map_link=map_link,
+    )
+
+    return NotifyResponse(
+        person_name=person.full_name,
+        triggered_at=event.triggered_at,
+        location_shared=map_link is not None,
+        map_link=map_link,
+        secure_link=secure_link,
+        contacts=[
+            NotifiedContact(
+                name=m.contact_name,
+                phone=m.contact_phone,
+                relation=m.contact_relation,
+                message=m.body,
+            )
+            for m in messages
+        ],
     )

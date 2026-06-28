@@ -85,13 +85,79 @@ def test_crisis_page_renders_guard_rail_for_insured_person(two_persons):
     assert "SH-CRISIS-1" in resp.text
 
 
-def test_crisis_page_omits_guard_rail_when_no_insurance(two_persons):
+def test_crisis_page_guard_rail_falls_back_when_no_insurance(two_persons):
+    """The Step 3 header always renders (no numbering gap); only its body falls
+    back to a 'no insurance' note when there's no insurance row."""
     _, p2 = two_persons  # p2 has no insurance row
     resp = client.get(f"/c/{p2.crisis_slug}")
     assert resp.status_code == 200
-    assert "Before you pay" not in resp.text
+    assert "Before you pay" in resp.text          # step still present
+    assert "No insurance details on file" in resp.text  # fallback body
+    assert "Step 4" in resp.text                  # numbering stays contiguous
 
 
 def test_crisis_page_404_on_unknown_slug():
     resp = client.get("/c/doesnotexist000000")
+    assert resp.status_code == 404
+
+
+def test_crisis_page_has_notify_button(two_persons):
+    p1, _ = two_persons
+    resp = client.get(f"/c/{p1.crisis_slug}")
+    assert resp.status_code == 200
+    assert "Notify family" in resp.text
+
+
+# ── Notify family (simulated send) ────────────────────────────────────────────
+
+def test_notify_with_location_returns_messages(two_persons):
+    p1, _ = two_persons  # has contact "Bob"
+    resp = client.post(f"/c/{p1.crisis_slug}/notify", json={"lat": 17.4, "lng": 78.5})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["person_name"] == "Test Alice"
+    assert body["location_shared"] is True
+    assert body["map_link"] == "https://www.google.com/maps?q=17.4,78.5"
+    assert f"/c/{p1.crisis_slug}" in body["secure_link"]
+    assert len(body["contacts"]) == 1
+    msg = body["contacts"][0]
+    assert msg["name"] == "Bob"
+    assert "Test Alice" in msg["message"]
+    assert "78.5" in msg["message"]
+
+
+def test_notify_without_location_still_succeeds(two_persons):
+    p1, _ = two_persons
+    resp = client.post(f"/c/{p1.crisis_slug}/notify", json={})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["location_shared"] is False
+    assert body["map_link"] is None
+    assert "not shared" in body["contacts"][0]["message"]
+
+
+def test_notify_records_event(two_persons, db):
+    from app.models.person import NotificationEvent
+    from sqlalchemy import select
+
+    p1, _ = two_persons
+    before = db.execute(
+        select(NotificationEvent).where(NotificationEvent.person_id == p1.id)
+    ).scalars().all()
+    client.post(f"/c/{p1.crisis_slug}/notify", json={"lat": 1.0, "lng": 2.0})
+    db.expire_all()
+    after = db.execute(
+        select(NotificationEvent).where(NotificationEvent.person_id == p1.id)
+    ).scalars().all()
+    assert len(after) == len(before) + 1
+
+
+def test_notify_invalid_coords_returns_422(two_persons):
+    p1, _ = two_persons
+    resp = client.post(f"/c/{p1.crisis_slug}/notify", json={"lat": 999, "lng": 0})
+    assert resp.status_code == 422
+
+
+def test_notify_404_on_unknown_slug():
+    resp = client.post("/c/doesnotexist000000/notify", json={})
     assert resp.status_code == 404
