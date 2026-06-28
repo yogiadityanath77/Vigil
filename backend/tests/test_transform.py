@@ -224,29 +224,39 @@ class TestGuardRail:
 
 
 class TestHumanizeAge:
-    """Pure relative-time phrasing (Slice 8)."""
+    """Pure relative-time phrasing (Slice 8). Takes a whole-day age."""
 
     def test_same_day_is_today(self):
-        assert humanize_age(NOW, NOW) == "confirmed today"
+        assert humanize_age(0) == "confirmed today"
 
-    def test_future_reads_as_today(self):
-        assert humanize_age(NOW, NOW + timedelta(hours=5)) == "confirmed today"
+    def test_negative_reads_as_today(self):
+        # Clock skew: a fact confirmed "in the future" still reads as today.
+        assert humanize_age(-1) == "confirmed today"
 
     def test_yesterday(self):
-        assert humanize_age(NOW, NOW - timedelta(days=1)) == "confirmed yesterday"
+        assert humanize_age(1) == "confirmed yesterday"
 
     def test_days(self):
-        assert humanize_age(NOW, NOW - timedelta(days=4)) == "confirmed 4 days ago"
+        assert humanize_age(4) == "confirmed 4 days ago"
 
     def test_weeks_singular_and_plural(self):
-        assert humanize_age(NOW, NOW - timedelta(days=7)) == "confirmed 1 week ago"
-        assert humanize_age(NOW, NOW - timedelta(days=21)) == "confirmed 3 weeks ago"
+        assert humanize_age(7) == "confirmed 1 week ago"
+        assert humanize_age(21) == "confirmed 3 weeks ago"
 
     def test_months(self):
-        assert humanize_age(NOW, NOW - timedelta(days=240)) == "confirmed 8 months ago"
+        assert humanize_age(30) == "confirmed 1 month ago"
+        assert humanize_age(240) == "confirmed 8 months ago"
+
+    def test_month_year_seam_has_no_artifact(self):
+        # 11 months → still months; 360–364d floors to 12mo but reads as a year.
+        assert humanize_age(359) == "confirmed 11 months ago"
+        assert humanize_age(360) == "confirmed 1 year ago"
+        assert humanize_age(364) == "confirmed 1 year ago"
 
     def test_years(self):
-        assert humanize_age(NOW, NOW - timedelta(days=400)) == "confirmed 1 year ago"
+        assert humanize_age(365) == "confirmed 1 year ago"
+        assert humanize_age(400) == "confirmed 1 year ago"
+        assert humanize_age(730) == "confirmed 2 years ago"
 
 
 class TestDoctorLineFreshness:

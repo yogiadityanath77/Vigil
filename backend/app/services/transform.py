@@ -26,13 +26,13 @@ from app.models.person import FactType
 STALE_AFTER_DAYS = 180
 
 
-def humanize_age(now: datetime, then: datetime) -> str:
+def humanize_age(days: int) -> str:
     """
-    Pure relative-time phrase for "confirmed <X>". Coarse on purpose — a
-    responder needs the gist ("weeks ago"), not precision. Future timestamps
-    (clock skew) and the current day both read as "today".
+    Pure relative-time phrase for "confirmed <X>", given a whole-day age.
+    Coarse on purpose — a responder needs the gist ("weeks ago"), not precision.
+    Non-positive ages (same day, or a future timestamp from clock skew) read as
+    "today". `days` is computed once by the caller and reused for staleness.
     """
-    days = (now - then).days
     if days <= 0:
         return "confirmed today"
     if days == 1:
@@ -44,6 +44,10 @@ def humanize_age(now: datetime, then: datetime) -> str:
         return f"confirmed {weeks} week{'s' if weeks > 1 else ''} ago"
     if days < 365:
         months = days // 30
+        # 360–364 days floor to 12 months — read that as a year, not "12 months",
+        # so the month→year seam has no artifact.
+        if months >= 12:
+            return "confirmed 1 year ago"
         return f"confirmed {months} month{'s' if months > 1 else ''} ago"
     years = days // 365
     return f"confirmed {years} year{'s' if years > 1 else ''} ago"
@@ -125,11 +129,11 @@ def build_crisis_script(person: "Person", *, now: datetime) -> CrisisScript:
     }
     buckets: dict[FactType, list[DoctorLine]] = {t: [] for t in FactType}
     for fact in person.medical_facts:
-        age_days = (now - fact.last_confirmed_at).days
+        age_days = (now - fact.last_confirmed_at).days  # computed once, reused below
         buckets[fact.type].append(
             DoctorLine(
                 text=sentence_for[fact.type](fact.value),
-                confirmed_label=humanize_age(now, fact.last_confirmed_at),
+                confirmed_label=humanize_age(age_days),
                 is_stale=age_days > STALE_AFTER_DAYS,
             )
         )
