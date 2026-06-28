@@ -202,6 +202,12 @@ class TestGuardRail:
         assert "Star Health" in script.guard_rail.detail
         assert "SH-999" in script.guard_rail.detail
 
+    def test_guard_rail_detail_uses_verify_at_desk_framing(self):
+        """Tone (Slice 10): the detail keeps us on the guide side — 'confirm at the
+        desk' rather than presenting a possibly-stale policy as a guarantee."""
+        person = _make_person(insurance=_insurance(cashless=True))
+        assert "confirm" in build_crisis_script(person, now=NOW).guard_rail.detail.lower()
+
     def test_non_cashless_headline_says_keep_bills(self):
         person = _make_person(
             insurance=_insurance(provider="HDFC Ergo", cashless=False)

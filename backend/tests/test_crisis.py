@@ -164,6 +164,15 @@ def test_crisis_page_has_notify_button(two_persons):
     assert "Notify family" in resp.text
 
 
+def test_crisis_page_has_steadying_opener(two_persons):
+    """Tone (Slice 10): the signature 'steady, then instruct' opener stays intact."""
+    p1, _ = two_persons
+    resp = client.get(f"/c/{p1.crisis_slug}")
+    assert resp.status_code == 200
+    assert "Take a breath" in resp.text
+    assert "one at a time" in resp.text
+
+
 # ── Notify family (simulated send) ────────────────────────────────────────────
 
 def test_notify_with_location_returns_messages(two_persons):

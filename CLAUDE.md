@@ -89,4 +89,12 @@ This is a LEARNING PROTOTYPE, built strictly one slice at a time. Not production
   - Public page gains a family hint link; family page has a "would be gated" note
   - Closes D8: Notify secure link now → family_url(slug); 96 tests passing (was 85)
   - No schema change; access_token table deferred to the real-gating slice
-- NEXT → Slice 10: care-and-agency tone pass over all copy
+- Slice 10 (care-and-agency tone pass over all copy): DONE
+  - Copy-only, no logic/schema change. Steadier crisis opener; care-and-agency
+    coordinator roster ("you've got this covered"); guard-rail detail gains
+    "verify at the desk" framing (liability mitigation); warmer family alert
+  - 98 tests passing (was 96); 2 added to lock tone-critical copy
+- PROTOTYPE COMPLETE — all 10 concept-conveying slices done.
+  Post-core candidates (future, each its own design): real auth + tiered-access
+  gating (access_token, D10), AI ingestion/extraction (extraction.py, D3),
+  real SMS + rate-limiting/escalation (D8), freshness nudges, offline/PWA.

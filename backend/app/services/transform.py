@@ -175,17 +175,19 @@ def _build_guard_rail(insurance) -> GuardRail | None:
 
     if insurance.cashless:
         headline = "Covered as cashless — don't pay upfront."
+        # "to confirm" keeps this on the guide side: verify at the desk rather
+        # than treat a possibly-stale policy as a guarantee (design-doc liability note).
         detail = (
-            f"Show this policy at the hospital desk: "
+            f"Show this at the desk to confirm — "
             f"{insurance.provider}, policy {insurance.policy_number}."
         )
     else:
         headline = f"Insured with {insurance.provider} — keep every bill for reimbursement."
-        detail = f"Policy {insurance.policy_number}."
+        detail = f"Show this at the desk to confirm — policy {insurance.policy_number}."
 
     hospital_line = None
     if insurance.hospital_preference:
-        hospital_line = f"If there's a choice, prefer {insurance.hospital_preference}."
+        hospital_line = f"If there's a choice of hospital, {insurance.hospital_preference} is preferred."
 
     return GuardRail(headline=headline, detail=detail, hospital_line=hospital_line)
 

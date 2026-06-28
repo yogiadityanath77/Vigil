@@ -39,6 +39,16 @@ def person(db: Session):
 
 # ── Person ────────────────────────────────────────────────────────────────────
 
+class TestCoordinatorRosterPage:
+
+    def test_family_html_renders_with_care_and_agency_copy(self, person):
+        """Tone (Slice 10): the calm-mode roster greets the coordinator warmly."""
+        resp = client.get("/coordinator/family")
+        assert resp.status_code == 200
+        assert "you've got this covered" in resp.text.lower()
+        assert person.full_name in resp.text
+
+
 class TestPersonEndpoints:
 
     def test_list_persons_returns_200(self):

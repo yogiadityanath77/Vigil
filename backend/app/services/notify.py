@@ -53,7 +53,7 @@ def build_notification_messages(
         f"Location: {map_link}. " if map_link else "Location: not shared. "
     )
     body = (
-        f"Emergency involving {person_name}. "
+        f"Emergency — {person_name} may need help right now. "
         f"{location_line}"
         f"Details: {secure_link}"
     )

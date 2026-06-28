@@ -58,6 +58,14 @@ class TestBuildNotificationMessages:
         assert "https://maps/here" in body
         assert "http://x/c/abc" in body
 
+    def test_message_reads_as_a_caring_alert(self):
+        """Tone (Slice 10): the body a real contact reads stays human, not a raw
+        'Emergency involving X' label."""
+        body = build_notification_messages(
+            "Priya Sharma", [_contact("Rahul", "111")], secure_link="link", map_link=None
+        )[0].body
+        assert "may need help right now" in body
+
     def test_ordered_by_notify_order(self):
         msgs = build_notification_messages(
             "P",
