@@ -83,4 +83,10 @@ This is a LEARNING PROTOTYPE, built strictly one slice at a time. Not production
   - Bumped on create, on /confirm endpoint, and on value/type edit (edit = re-affirm)
   - Crisis page shows "confirmed X ago"; stale (>180d) flagged amber "may be outdated"
   - Seed backdates 2 facts for a fresh/stale demo mix; 85 tests passing (was 68)
-- NEXT → Slice 9: two-level hint (open script vs. richer "for family" view)
+- Slice 9 (two-level hint — public script vs. richer "for family" view): DONE
+  - GET /c/{slug}/family (sub-path off the slug; "shown, not secured"); D10 logged
+  - Pure build_family_view → FamilyView (ALL contacts + exact fact dates + insurance)
+  - Public page gains a family hint link; family page has a "would be gated" note
+  - Closes D8: Notify secure link now → family_url(slug); 96 tests passing (was 85)
+  - No schema change; access_token table deferred to the real-gating slice
+- NEXT → Slice 10: care-and-agency tone pass over all copy

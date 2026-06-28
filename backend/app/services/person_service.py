@@ -51,6 +51,12 @@ def crisis_url(slug: str) -> str:
     return f"{settings.base_url.rstrip('/')}/c/{slug}"
 
 
+def family_url(slug: str) -> str:
+    """The richer family-tier view URL (a sub-path of the crisis page, Slice 9).
+    This is the 'secure link' carried in the Notify-family message (D8)."""
+    return f"{crisis_url(slug)}/family"
+
+
 # ── Person ───────────────────────────────────────────────────────────────────
 
 def create_person(db: Session, data: PersonCreate) -> Person:

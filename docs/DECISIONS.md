@@ -100,3 +100,26 @@ the `STALE_AFTER_DAYS = 180` threshold also live in transform.py as pure helpers
 cue — honesty, not hiding. The freshness *nudge/reminder engine* remains deferred (prototype-spec).
 **Affects:** slice 8 schema/transform/endpoint/template; the transform's output contract (any
 renderer now consumes DoctorLine objects); later freshness-nudge and per-person-timestamp slices.
+
+## D10 — Two tiers by presentation, not enforcement; family view is a slug sub-path (no token table yet)
+The "for family" tier (`GET /c/{slug}/family`) is a richer view of the same person — ALL contacts
+(the public script shows only the primary), each fact's exact confirmation date, and the insurance
+block. It is reached via a sub-path of the EXISTING crisis slug; anyone holding the slug can open it.
+**Why no access_token table now:** architecture.md suggested "model access_token now," but
+prototype-spec's What's-OUT lists real auth/gating as a later slice, and this step is explicitly
+"shown, not really secured yet." A half-used token table + migration would be scope creep for a
+*presentation*-tiering demo. The family page carries an honest note that production would gate it.
+Deferring keeps D4's slug-as-capability model intact (one capability per person, for now).
+**Transform:** `build_family_view(person, *, now) -> FamilyView`, pure like build_crisis_script,
+reuses the shared fact ordering (`_ordered_facts` / `_SENTENCE_FOR`) and `_build_guard_rail` so the
+two tiers never drift. The public/family split is also a DATA decision: the public transform keeps
+only the primary contact; the family transform keeps the full roster.
+**Closes D8:** the Notify-family "secure link" now points at `family_url(slug)` (= `.../family`),
+not the bare crisis page — the message's richer detail rides the family tier.
+**Affects:** slice 9 routes/templates/transform; the later real-gating slice (introduces
+access_token + per-tier tokens, and turns this presentation split into enforced access).
+**Open question for the real-gating slice:** the insurance guard-rail — including the full
+`policy_number` — currently renders on BOTH the public crisis page and the family view. That's
+defensible today (a responder needs the policy at the hospital desk, so it belongs in the open help
+script), but when access is actually enforced, decide deliberately whether the policy number stays
+in the open tier or moves to family-only. Don't let it stay public by inertia.

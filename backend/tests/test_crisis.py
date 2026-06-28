@@ -101,6 +101,38 @@ def test_crisis_page_404_on_unknown_slug():
     assert resp.status_code == 404
 
 
+def test_crisis_page_has_family_hint(two_persons):
+    p1, _ = two_persons
+    resp = client.get(f"/c/{p1.crisis_slug}")
+    assert resp.status_code == 200
+    assert f"/c/{p1.crisis_slug}/family" in resp.text
+
+
+# ── Family-tier view (Slice 9) ────────────────────────────────────────────────
+
+def test_family_page_renders(two_persons):
+    p1, _ = two_persons  # Test Alice: contact "Bob", allergy "Penicillin", insurance
+    resp = client.get(f"/c/{p1.crisis_slug}/family")
+    assert resp.status_code == 200
+    assert "For Family" in resp.text
+    assert "Bob" in resp.text          # full contact roster
+    assert "Penicillin" in resp.text   # medical history
+    assert "last confirmed" in resp.text  # exact date label
+    assert "Back to emergency script" in resp.text
+
+
+def test_family_page_404_on_unknown_slug():
+    resp = client.get("/c/doesnotexist000000/family")
+    assert resp.status_code == 404
+
+
+def test_notify_secure_link_points_to_family(two_persons):
+    p1, _ = two_persons
+    resp = client.post(f"/c/{p1.crisis_slug}/notify", json={})
+    assert resp.status_code == 200
+    assert resp.json()["secure_link"].endswith(f"/c/{p1.crisis_slug}/family")
+
+
 def test_crisis_page_shows_freshness_label(two_persons):
     p1, _ = two_persons  # facts just created → "confirmed today"
     resp = client.get(f"/c/{p1.crisis_slug}")

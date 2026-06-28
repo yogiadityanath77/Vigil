@@ -24,8 +24,10 @@ from app.services.transform import (
     STALE_AFTER_DAYS,
     CrisisScript,
     DoctorLine,
+    FamilyView,
     GuardRail,
     build_crisis_script,
+    build_family_view,
     humanize_age,
 )
 
@@ -293,3 +295,54 @@ class TestDoctorLineFreshness:
         )
         assert build_crisis_script(at, now=NOW).doctor_lines[0].is_stale is False
         assert build_crisis_script(past, now=NOW).doctor_lines[0].is_stale is True
+
+
+class TestBuildFamilyView:
+    """The richer 'for family' tier (Slice 9)."""
+
+    def test_returns_family_view(self):
+        view = build_family_view(_make_person(), now=NOW)
+        assert isinstance(view, FamilyView)
+
+    def test_includes_all_contacts_ordered(self):
+        """Public script keeps only the primary; the family view keeps them all."""
+        person = _make_person(
+            contacts=[
+                _contact("Second", "222", notify_order=2),
+                _contact("First", "111", notify_order=1),
+            ]
+        )
+        view = build_family_view(person, now=NOW)
+        assert [c.name for c in view.contacts] == ["First", "Second"]
+        assert len(view.contacts) == 2
+
+    def test_facts_ordered_with_exact_and_relative_dates(self):
+        person = _make_person(facts=[
+            _fact(FactType.condition, "Hypertension", NOW - timedelta(days=240)),
+            _fact(FactType.allergy, "Penicillin"),
+        ])
+        view = build_family_view(person, now=NOW)
+        # allergy first, then condition
+        assert "Penicillin" in view.facts[0].text
+        assert "Hypertension" in view.facts[1].text
+        # exact date present, plus relative label + stale flag on the old one
+        assert view.facts[1].confirmed_label == "confirmed 8 months ago"
+        assert view.facts[1].confirmed_on  # non-empty exact date
+        assert view.facts[1].is_stale is True
+        assert view.facts[0].is_stale is False
+
+    def test_reuses_guard_rail(self):
+        person = _make_person(insurance=_insurance(cashless=True))
+        view = build_family_view(person, now=NOW)
+        assert isinstance(view.guard_rail, GuardRail)
+        assert view.has_guard_rail
+
+    def test_no_insurance_no_guard_rail(self):
+        view = build_family_view(_make_person(insurance=None), now=NOW)
+        assert view.guard_rail is None
+        assert not view.has_guard_rail
+
+    def test_empty_person(self):
+        view = build_family_view(_make_person(), now=NOW)
+        assert not view.has_contacts
+        assert not view.has_facts

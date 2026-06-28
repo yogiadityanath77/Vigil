@@ -103,6 +103,27 @@
       font-weight: 600;
     }
 
+    /* ── Family-tier hint ─────────────────────────────────────────── */
+    .family-hint {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid #eeeeee;
+      text-align: center;
+    }
+    .family-hint a {
+      font-size: 0.92rem;
+      color: #555555;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .family-hint a:hover { color: #1a5276; text-decoration: underline; }
+    .family-hint .sub {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.78rem;
+      color: #999999;
+    }
+
     .no-info {
       color: #888888;
       font-style: italic;
@@ -255,6 +276,13 @@
     <button class="notify-btn" id="notify-btn">🔔 Notify family</button>
     <div class="notify-status" id="notify-status"></div>
     <div class="sent-panel" id="sent-panel" style="display:none;"></div>
+  </div>
+
+  <!-- Two-level hint: stranger sees the help script above; family can open the
+       fuller record. Shown to all (slug-reachable), not access-gated yet. -->
+  <div class="family-hint">
+    <a href="/c/{{ slug }}/family">👪 Family member? See full details →</a>
+    <span class="sub">All contacts, insurance, and full history</span>
   </div>
 
   <script>

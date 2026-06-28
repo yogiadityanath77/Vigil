@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.models.person import Person
+    from app.models.person import MedicalFact, Person
 
 from app.models.person import FactType
 
@@ -104,6 +104,22 @@ class CrisisScript:
         return self.guard_rail is not None
 
 
+# Fact display order and the sentence template for each type. Shared by both the
+# public crisis script and the family view so ordering/wording never diverge.
+_FACT_ORDER = {FactType.allergy: 0, FactType.medication: 1, FactType.condition: 2}
+_SENTENCE_FOR = {
+    FactType.allergy: lambda v: f"They are allergic to {v}.",
+    FactType.medication: lambda v: f"They take {v}.",
+    FactType.condition: lambda v: f"They have {v}.",
+}
+
+
+def _ordered_facts(person: "Person") -> list["MedicalFact"]:
+    """Facts in display order: allergies → medications → conditions.
+    Stable sort, so insertion order within a type is preserved."""
+    return sorted(person.medical_facts, key=lambda f: _FACT_ORDER[f.type])
+
+
 def build_crisis_script(person: "Person", *, now: datetime) -> CrisisScript:
     """
     Transform a Person (with loaded relationships) into a CrisisScript.
@@ -122,27 +138,16 @@ def build_crisis_script(person: "Person", *, now: datetime) -> CrisisScript:
     primary = contacts[0] if contacts else None
 
     # ── Doctor lines (allergies → medications → conditions) ─────────────────
-    sentence_for = {
-        FactType.allergy: lambda v: f"They are allergic to {v}.",
-        FactType.medication: lambda v: f"They take {v}.",
-        FactType.condition: lambda v: f"They have {v}.",
-    }
-    buckets: dict[FactType, list[DoctorLine]] = {t: [] for t in FactType}
-    for fact in person.medical_facts:
+    doctor_lines: list[DoctorLine] = []
+    for fact in _ordered_facts(person):
         age_days = (now - fact.last_confirmed_at).days  # computed once, reused below
-        buckets[fact.type].append(
+        doctor_lines.append(
             DoctorLine(
-                text=sentence_for[fact.type](fact.value),
+                text=_SENTENCE_FOR[fact.type](fact.value),
                 confirmed_label=humanize_age(age_days),
                 is_stale=age_days > STALE_AFTER_DAYS,
             )
         )
-
-    doctor_lines: list[DoctorLine] = [
-        *buckets[FactType.allergy],
-        *buckets[FactType.medication],
-        *buckets[FactType.condition],
-    ]
 
     # ── Money guard-rail (insurance) ────────────────────────────────────────
     guard_rail = _build_guard_rail(person.insurance)
@@ -183,3 +188,84 @@ def _build_guard_rail(insurance) -> GuardRail | None:
         hospital_line = f"If there's a choice, prefer {insurance.hospital_preference}."
 
     return GuardRail(headline=headline, detail=detail, hospital_line=hospital_line)
+
+
+# ── Family view (the richer "for family" tier — Slice 9) ──────────────────────
+# Same person, fuller record than the public crisis script: ALL contacts (the
+# public script shows only the primary), each fact's EXACT confirmation date
+# alongside the relative label, plus the insurance block. "Shown, not secured."
+
+_DATE_FMT = "%d %b %Y"  # e.g. "20 Oct 2025" — cross-platform (no %-d)
+
+
+@dataclass
+class FamilyContact:
+    name: str
+    phone: str
+    relation: str | None
+    notify_order: int
+
+
+@dataclass
+class FamilyFact:
+    text: str
+    confirmed_label: str  # relative: "confirmed 8 months ago"
+    confirmed_on: str     # exact: "20 Oct 2025"
+    is_stale: bool
+
+
+@dataclass
+class FamilyView:
+    """The richer record shown to family — plain data, ready to render."""
+
+    person_name: str
+    registered_on: str
+    contacts: list[FamilyContact] = field(default_factory=list)
+    facts: list[FamilyFact] = field(default_factory=list)
+    guard_rail: GuardRail | None = None
+
+    @property
+    def has_contacts(self) -> bool:
+        return bool(self.contacts)
+
+    @property
+    def has_facts(self) -> bool:
+        return bool(self.facts)
+
+    @property
+    def has_guard_rail(self) -> bool:
+        return self.guard_rail is not None
+
+
+def build_family_view(person: "Person", *, now: datetime) -> FamilyView:
+    """
+    Transform a Person into the family-tier record. Pure (like build_crisis_script):
+    `now` is passed in, no clock read. Reuses the shared fact ordering/wording and
+    the guard-rail composition so the two tiers never drift apart.
+    """
+    contacts = [
+        FamilyContact(
+            name=c.name, phone=c.phone, relation=c.relation, notify_order=c.notify_order
+        )
+        for c in sorted(person.emergency_contacts, key=lambda c: c.notify_order)
+    ]
+
+    facts: list[FamilyFact] = []
+    for fact in _ordered_facts(person):
+        age_days = (now - fact.last_confirmed_at).days
+        facts.append(
+            FamilyFact(
+                text=_SENTENCE_FOR[fact.type](fact.value),
+                confirmed_label=humanize_age(age_days),
+                confirmed_on=fact.last_confirmed_at.strftime(_DATE_FMT),
+                is_stale=age_days > STALE_AFTER_DAYS,
+            )
+        )
+
+    return FamilyView(
+        person_name=person.full_name,
+        registered_on=person.created_at.strftime(_DATE_FMT),
+        contacts=contacts,
+        facts=facts,
+        guard_rail=_build_guard_rail(person.insurance),
+    )

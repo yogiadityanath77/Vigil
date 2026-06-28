@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family details — {{ view.person_name }}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #ffffff;
+      color: #111111;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .back {
+      display: inline-block;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+      color: #555555;
+      text-decoration: none;
+    }
+    .back:hover { text-decoration: underline; }
+
+    /* ── For-family banner ────────────────────────────────────────── */
+    .banner {
+      background: #1a5276;
+      color: #ffffff;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .person-name { font-size: 1.5rem; font-weight: 700; }
+    .registered { font-size: 0.8rem; color: #888888; margin-bottom: 24px; }
+
+    .section { margin-bottom: 28px; }
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: #555555;
+      margin-bottom: 10px;
+    }
+
+    .row {
+      padding: 10px 0;
+      border-bottom: 1px solid #eeeeee;
+    }
+    .row:last-child { border-bottom: none; }
+    .row .primary { font-weight: 600; }
+    .row .meta { font-size: 0.82rem; color: #888888; }
+    .row .phone { color: #1a5276; text-decoration: none; }
+
+    .fact .dates {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.78rem;
+      color: #999999;
+    }
+    .fact .dates.stale { color: #b8860b; font-weight: 600; }
+
+    .guard-rail {
+      background: #fef6e6;
+      border: 1px solid #e0a800;
+      border-left: 4px solid #e0a800;
+      border-radius: 0 6px 6px 0;
+      padding: 14px 16px;
+    }
+    .guard-rail .headline { font-weight: 700; color: #7a5c00; margin-bottom: 6px; }
+    .guard-rail .detail, .guard-rail .hospital { font-size: 0.98rem; color: #4a4a4a; }
+    .guard-rail .hospital { margin-top: 8px; }
+
+    .no-info { color: #888888; font-style: italic; font-size: 0.95rem; }
+
+    /* ── "Not really secured yet" honesty note ────────────────────── */
+    .tier-note {
+      margin-top: 24px;
+      padding: 12px 14px;
+      background: #f4f4f5;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      color: #777777;
+    }
+  </style>
+</head>
+<body>
+
+  <a class="back" href="/c/{{ slug }}">← Back to emergency script</a>
+
+  <div class="banner">👪 For Family — Full Details</div>
+
+  <div class="person-name">{{ view.person_name }}</div>
+  <div class="registered">On file since {{ view.registered_on }}</div>
+
+  <!-- All contacts (the public script shows only the first) -->
+  <div class="section">
+    <div class="section-label">Emergency contacts</div>
+    {% if view.has_contacts %}
+      {% for c in view.contacts %}
+        <div class="row">
+          <div class="primary">{{ c.name }}{% if c.relation %} ({{ c.relation }}){% endif %}</div>
+          <a class="phone" href="tel:{{ c.phone }}">{{ c.phone }}</a>
+          <span class="meta"> · call order {{ c.notify_order }}</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="no-info">No contacts on file.</div>
+    {% endif %}
+  </div>
+
+  <!-- Full medical facts with exact confirmation dates -->
+  <div class="section">
+    <div class="section-label">Medical history</div>
+    {% if view.has_facts %}
+      {% for f in view.facts %}
+        <div class="row fact">
+          {{ f.text }}
+          <span class="dates{% if f.is_stale %} stale{% endif %}">
+            {{ f.confirmed_label }} · last confirmed {{ f.confirmed_on }}{% if f.is_stale %} · may be outdated{% endif %}
+          </span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="no-info">No medical history on file.</div>
+    {% endif %}
+  </div>
+
+  <!-- Insurance / logistics -->
+  <div class="section">
+    <div class="section-label">Insurance</div>
+    {% if view.has_guard_rail %}
+      <div class="guard-rail">
+        <div class="headline">{{ view.guard_rail.headline }}</div>
+        <div class="detail">{{ view.guard_rail.detail }}</div>
+        {% if view.guard_rail.hospital_line %}
+          <div class="hospital">{{ view.guard_rail.hospital_line }}</div>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="no-info">No insurance details on file.</div>
+    {% endif %}
+  </div>
+
+  <div class="tier-note">
+    🔒 This fuller view is meant for family. In the prototype it's reachable by
+    anyone with the link — in production it would require a family access pass.
+  </div>
+
+</body>
+</html>

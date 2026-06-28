@@ -26,7 +26,7 @@ from app.models.person import Person
 from app.schemas.crisis import NotifiedContact, NotifyRequest, NotifyResponse
 from app.services import person_service
 from app.services.notify import build_notification_messages, maps_link
-from app.services.transform import build_crisis_script
+from app.services.transform import build_crisis_script, build_family_view
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -60,6 +60,22 @@ def crisis_page(slug: str, request: Request, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/c/{slug}/family")
+def family_page(slug: str, request: Request, db: Session = Depends(get_db)):
+    """
+    The richer 'for family' tier. Reached by anyone holding the slug — the tiering
+    is in *presentation*, not enforcement (prototype-spec: 'shown, not secured').
+    Real access-gating (per-tier tokens) is a later slice.
+    """
+    person = _get_person_by_slug(db, slug)
+    view = build_family_view(person, now=datetime.now(timezone.utc))
+    return templates.TemplateResponse(
+        request=request,
+        name="family.html",
+        context={"view": view, "slug": slug},
+    )
+
+
 @router.post("/c/{slug}/notify", response_model=NotifyResponse)
 def notify_family(
     slug: str, data: NotifyRequest, db: Session = Depends(get_db)
@@ -76,9 +92,9 @@ def notify_family(
     event = person_service.record_notification(db, person, data.lat, data.lng)
 
     map_link = maps_link(data.lat, data.lng)
-    # The secure link is the unguessable crisis URL — the richer "for family"
-    # tiered view is Slice 9; until then this is the honest target.
-    secure_link = person_service.crisis_url(slug)
+    # The "Details:" secure link points at the richer family-tier view (Slice 9),
+    # keeping the sensitive detail out of the message body itself.
+    secure_link = person_service.family_url(slug)
 
     messages = build_notification_messages(
         person_name=person.full_name,
