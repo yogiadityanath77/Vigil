@@ -1,0 +1,123 @@
+"""
+person_service.py — thin service layer for Person CRUD.
+
+Centralises crisis_slug generation here so it is never client-supplied
+and never constructed inline elsewhere (seed.py, tests, etc. call this).
+"""
+from __future__ import annotations
+
+import secrets
+import uuid
+
+from sqlalchemy.orm import Session
+
+from app.models.person import EmergencyContact, FactType, MedicalFact, Person
+from app.schemas.coordinator import (
+    ContactCreate,
+    ContactUpdate,
+    FactCreate,
+    FactUpdate,
+    PersonCreate,
+    PersonUpdate,
+)
+
+
+def generate_crisis_slug() -> str:
+    return secrets.token_urlsafe(8)
+
+
+# ── Person ───────────────────────────────────────────────────────────────────
+
+def create_person(db: Session, data: PersonCreate) -> Person:
+    person = Person(full_name=data.full_name, crisis_slug=generate_crisis_slug())
+    db.add(person)
+    db.commit()
+    db.refresh(person)
+    return person
+
+
+def get_person(db: Session, person_id: uuid.UUID) -> Person | None:
+    return db.get(Person, person_id)
+
+
+def update_person(db: Session, person: Person, data: PersonUpdate) -> Person:
+    person.full_name = data.full_name
+    db.commit()
+    db.refresh(person)
+    return person
+
+
+# ── Medical facts ─────────────────────────────────────────────────────────────
+
+def add_fact(db: Session, person: Person, data: FactCreate) -> MedicalFact:
+    fact = MedicalFact(person_id=person.id, type=data.type, value=data.value)
+    db.add(fact)
+    db.commit()
+    db.refresh(fact)
+    return fact
+
+
+def get_fact(db: Session, fact_id: uuid.UUID, person_id: uuid.UUID) -> MedicalFact | None:
+    fact = db.get(MedicalFact, fact_id)
+    if fact is None or fact.person_id != person_id:
+        return None
+    return fact
+
+
+def update_fact(db: Session, fact: MedicalFact, data: FactUpdate) -> MedicalFact:
+    if data.type is not None:
+        fact.type = data.type
+    if data.value is not None:
+        fact.value = data.value
+    db.commit()
+    db.refresh(fact)
+    return fact
+
+
+def delete_fact(db: Session, fact: MedicalFact) -> None:
+    db.delete(fact)
+    db.commit()
+
+
+# ── Emergency contacts ────────────────────────────────────────────────────────
+
+def add_contact(db: Session, person: Person, data: ContactCreate) -> EmergencyContact:
+    contact = EmergencyContact(
+        person_id=person.id,
+        name=data.name,
+        phone=data.phone,
+        relation=data.relation,
+        notify_order=data.notify_order,
+    )
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+def get_contact(
+    db: Session, contact_id: uuid.UUID, person_id: uuid.UUID
+) -> EmergencyContact | None:
+    contact = db.get(EmergencyContact, contact_id)
+    if contact is None or contact.person_id != person_id:
+        return None
+    return contact
+
+
+def update_contact(db: Session, contact: EmergencyContact, data: ContactUpdate) -> EmergencyContact:
+    if data.name is not None:
+        contact.name = data.name
+    if data.phone is not None:
+        contact.phone = data.phone
+    if data.relation is not None:
+        contact.relation = data.relation
+    if data.notify_order is not None:
+        contact.notify_order = data.notify_order
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+def delete_contact(db: Session, contact: EmergencyContact) -> None:
+    db.delete(contact)
+    db.commit()
